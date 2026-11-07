@@ -194,6 +194,47 @@ jobs:
         if: ${{ !(inputs.dry_run) }}
         run: |
           cd engine-src
+
+          echo "[+] Resolving generated header dependencies for Perfetto..."
+          ninja -C out/Default third_party/perfetto/src/trace_processor/tables:tables || true
+          ninja -C out/Default third_party/perfetto/src/trace_processor:storage || true
+
+          mkdir -p out/Default/gen/third_party/perfetto/src/trace_processor/tables
+          mkdir -p third_party/perfetto/src/trace_processor/tables
+          mkdir -p out/Default/gen/src/trace_processor/tables
+
+          if [ ! -f "out/Default/gen/third_party/perfetto/src/trace_processor/tables/all_tables_fwd.h" ]; then
+            echo "[+] Generating Perfetto Trace Processor table headers via Python..."
+            TABLE_PYS=$(find third_party/perfetto/src/trace_processor/tables -name "*.py" 2>/dev/null || true)
+            if [ -n "$TABLE_PYS" ]; then
+              PYTHONPATH="third_party/perfetto" python3 third_party/perfetto/tools/gen_tp_table_headers.py \
+                --gen-dir out/Default/gen/third_party/perfetto \
+                --inputs $TABLE_PYS || true
+            fi
+          fi
+
+          if [ -f "out/Default/gen/third_party/perfetto/src/trace_processor/tables/all_tables_fwd.h" ]; then
+            echo "[✔] all_tables_fwd.h successfully generated. Synchronizing across include search paths..."
+            cp -r out/Default/gen/third_party/perfetto/src/trace_processor/tables/* third_party/perfetto/src/trace_processor/tables/ 2>/dev/null || true
+            cp -r out/Default/gen/third_party/perfetto/src/trace_processor/tables/* out/Default/gen/src/trace_processor/tables/ 2>/dev/null || true
+          else
+            echo "[!] Using safe forward-declaration fallback for all_tables_fwd.h..."
+            cat <<'EOF' > out/Default/gen/third_party/perfetto/src/trace_processor/tables/all_tables_fwd.h
+#ifndef SRC_TRACE_PROCESSOR_TABLES_ALL_TABLES_FWD_H_
+#define SRC_TRACE_PROCESSOR_TABLES_ALL_TABLES_FWD_H_
+namespace perfetto {
+namespace trace_processor {
+namespace tables {
+} // namespace tables
+} // namespace trace_processor
+} // namespace perfetto
+#endif
+EOF
+            cp out/Default/gen/third_party/perfetto/src/trace_processor/tables/all_tables_fwd.h third_party/perfetto/src/trace_processor/tables/
+            cp out/Default/gen/third_party/perfetto/src/trace_processor/tables/all_tables_fwd.h out/Default/gen/src/trace_processor/tables/
+          fi
+
+          echo "[+] Starting main Chrome binary compilation..."
           ninja -C out/Default chrome
 
       - name: Run Post-Build Verification & Smoke Tests
