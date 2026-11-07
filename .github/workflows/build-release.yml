@@ -55,6 +55,7 @@ jobs:
             downloads.ini
             pruning.list
             domain_substitution.list
+            domain_regex.list
           sparse-checkout-cone-mode: false
           path: core-whitelist
 
@@ -85,7 +86,7 @@ jobs:
         run: |
           cd engine-src
           python3 ../core-whitelist/utils/prune_binaries.py . ../core-whitelist/pruning.list
-          python3 ../core-whitelist/utils/domain_substitution.py apply -r ../core-whitelist/domain_substitution.list -c ../domsubcache.tar.gz .
+          python3 ../core-whitelist/utils/domain_substitution.py apply -r ../core-whitelist/domain_regex.list -f ../core-whitelist/domain_substitution.list -c ../domsubcache.tar.gz .
 
       - name: Apply Core Runtime Patches
         run: |
