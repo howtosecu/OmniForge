@@ -119,6 +119,11 @@ jobs:
           sudo npm install -g esbuild@0.25.1 rollup
           esbuild --version
 
+          echo "[+] Installing cargo and cxxbridge-cmd CLI..."
+          sudo apt-get install -y cargo
+          cargo install cxxbridge-cmd --root /usr/local || true
+          cxxbridge --version || true
+
       - name: Download Engine Source Tarball
         run: |
           VERSION="${{ inputs.version || '148.0.7778.215' }}"
@@ -287,30 +292,34 @@ jobs:
           fi
 
           echo "[+] Resolving generated header dependencies for Rust CXX bridges..."
-          ninja -C out/Default third_party/rust/serde_json_lenient/v0_2/wrapper:wrapper || \
-          ninja -C out/Default third_party/rust/serde_json_lenient/v0_2/wrapper || true
-          ninja -C out/Default base/logging/rust_logger || true
+          ninja -C out/Default third_party/rust/serde_json_lenient/v0_2/wrapper:wrapper_cxx_generated || true
+          ninja -C out/Default base/logging/rust_logger:rust_logger_cxx_generated || true
+          ninja -C out/Default third_party/rust/serde_json_lenient/v0_2/wrapper:wrapper || true
 
           mkdir -p out/Default/gen/third_party/rust/serde_json_lenient/v0_2/wrapper
           mkdir -p third_party/rust/serde_json_lenient/v0_2/wrapper
+          mkdir -p out/Default/gen/base/logging/rust_logger
+          mkdir -p base/logging/rust_logger
 
-          if [ ! -f "out/Default/gen/third_party/rust/serde_json_lenient/v0_2/wrapper/lib.rs.h" ]; then
-            echo "[+] Generating serde_json_lenient cxxbridge header via hermetic toolchain..."
-            CXXBRIDGE_BIN="third_party/rust-toolchain/bin/cxxbridge"
-            if [ -x "$CXXBRIDGE_BIN" ] && [ -f "third_party/rust/serde_json_lenient/v0_2/wrapper/lib.rs" ]; then
-              $CXXBRIDGE_BIN third_party/rust/serde_json_lenient/v0_2/wrapper/lib.rs --header > out/Default/gen/third_party/rust/serde_json_lenient/v0_2/wrapper/lib.rs.h 2>/dev/null || true
-            fi
+          if command -v cxxbridge &> /dev/null && [ -f "third_party/rust/serde_json_lenient/v0_2/wrapper/lib.rs" ]; then
+            echo "[+] Generating serde_json_lenient cxxbridge header via standalone CLI..."
+            cxxbridge third_party/rust/serde_json_lenient/v0_2/wrapper/lib.rs --header > out/Default/gen/third_party/rust/serde_json_lenient/v0_2/wrapper/lib.rs.h 2>/dev/null || true
+            cxxbridge third_party/rust/serde_json_lenient/v0_2/wrapper/lib.rs > out/Default/gen/third_party/rust/serde_json_lenient/v0_2/wrapper/lib.rs.cc 2>/dev/null || true
+            cp -f out/Default/gen/third_party/rust/serde_json_lenient/v0_2/wrapper/lib.rs.h third_party/rust/serde_json_lenient/v0_2/wrapper/lib.rs.h 2>/dev/null || true
           fi
 
+          if command -v cxxbridge &> /dev/null && [ -f "base/logging/rust_logger/lib.rs" ]; then
+            echo "[+] Generating rust_logger cxxbridge header via standalone CLI..."
+            cxxbridge base/logging/rust_logger/lib.rs --header > out/Default/gen/base/logging/rust_logger/lib.rs.h 2>/dev/null || true
+            cp -f out/Default/gen/base/logging/rust_logger/lib.rs.h base/logging/rust_logger/lib.rs.h 2>/dev/null || true
+          fi
+
+          # Also copy generated header from gen/ if ninja produced it
           if [ -f "out/Default/gen/third_party/rust/serde_json_lenient/v0_2/wrapper/lib.rs.h" ]; then
-            echo "[✔] serde_json_lenient lib.rs.h verified. Synchronizing across include search paths..."
-            cp out/Default/gen/third_party/rust/serde_json_lenient/v0_2/wrapper/lib.rs.h third_party/rust/serde_json_lenient/v0_2/wrapper/ 2>/dev/null || true
+            cp -f out/Default/gen/third_party/rust/serde_json_lenient/v0_2/wrapper/lib.rs.h third_party/rust/serde_json_lenient/v0_2/wrapper/lib.rs.h 2>/dev/null || true
           fi
 
-          if [ -f "out/Default/gen/base/logging/rust_logger/lib.rs.h" ]; then
-            mkdir -p base/logging/rust_logger
-            cp out/Default/gen/base/logging/rust_logger/lib.rs.h base/logging/rust_logger/ 2>/dev/null || true
-          fi
+          find out/Default/gen -name "*lib.rs.h*" -exec cp {} third_party/rust/serde_json_lenient/v0_2/wrapper/lib.rs.h \; 2>/dev/null || true
 
           echo "[+] Starting main Chrome binary compilation..."
           ninja -C out/Default chrome
