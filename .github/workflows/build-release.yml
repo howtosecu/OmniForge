@@ -152,6 +152,11 @@ jobs:
           echo "[+] Installing Chromium Rust toolchain..."
           python3 tools/rust/update_rust.py
 
+          echo "[+] Linking system Node.js into Chromium third_party tree..."
+          mkdir -p third_party/node/linux/node-linux-x64/bin
+          ln -sf $(which node) third_party/node/linux/node-linux-x64/bin/node
+          ./third_party/node/linux/node-linux-x64/bin/node -v
+
       - name: Configure GN Compilation Arguments
         run: |
           cd engine-src
