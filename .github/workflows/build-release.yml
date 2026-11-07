@@ -271,11 +271,11 @@ jobs:
           fi
 
           echo "[+] Resolving generated header dependencies for Perfetto IPC & Wire Protocol..."
-          ninja -C out/Default \
-            third_party/perfetto/protos/perfetto/ipc:cpp \
-            third_party/perfetto/protos/perfetto/ipc:zero \
-            third_party/perfetto/protos/perfetto/ipc:wire_protocol_cpp \
-            third_party/perfetto/protos/perfetto/ipc:wire_protocol_zero || true
+          ninja -C out/Default third_party/perfetto/protos/perfetto/ipc:wire_protocol_cpp || true
+          ninja -C out/Default third_party/perfetto/protos/perfetto/ipc:wire_protocol_zero || true
+          ninja -C out/Default third_party/perfetto/protos/perfetto/ipc:cpp || true
+          ninja -C out/Default gen/third_party/perfetto/protos/perfetto/ipc/wire_protocol.gen.h || true
+          ninja -C out/Default gen/third_party/perfetto/protos/perfetto/ipc/wire_protocol.pbzero.h || true
 
           mkdir -p out/Default/gen/protos/perfetto/ipc
           mkdir -p third_party/perfetto/protos/perfetto/ipc
