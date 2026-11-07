@@ -14,7 +14,7 @@ if [ "$ARCH" != "x86_64" ]; then
     exit 1
 fi
 
-EDITION="${EDITION:-agentic}"
+EDITION="${EDITION:-phantom}"
 INSTALL_DIR="/opt/omniforge"
 BIN_LINK="/usr/local/bin/omniforge"
 

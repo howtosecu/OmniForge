@@ -12,12 +12,13 @@ on:
         required: true
         default: "v1.0.0"
       edition:
-        description: "Edition flavor to build: 'agentic', 'sovereign', or 'both'"
+        description: "Edition flavor to build: 'phantom', 'agentic', 'sovereign', or 'all'"
         required: true
-        default: "both"
+        default: "phantom"
         type: choice
         options:
-          - "both"
+          - "phantom"
+          - "all"
           - "agentic"
           - "sovereign"
       dry_run:
@@ -42,13 +43,17 @@ jobs:
     steps:
       - id: set-matrix
         run: |
-          CHOICE="${{ inputs.edition || 'both' }}"
-          if [ "$CHOICE" = "agentic" ]; then
+          CHOICE="${{ inputs.edition || 'phantom' }}"
+          if [ "$CHOICE" = "phantom" ]; then
+            echo 'editions=["phantom"]' >> $GITHUB_OUTPUT
+          elif [ "$CHOICE" = "agentic" ]; then
             echo 'editions=["agentic"]' >> $GITHUB_OUTPUT
           elif [ "$CHOICE" = "sovereign" ]; then
             echo 'editions=["sovereign"]' >> $GITHUB_OUTPUT
+          elif [ "$CHOICE" = "all" ] || [ "$CHOICE" = "both" ]; then
+            echo 'editions=["phantom", "agentic", "sovereign"]' >> $GITHUB_OUTPUT
           else
-            echo 'editions=["agentic", "sovereign"]' >> $GITHUB_OUTPUT
+            echo 'editions=["phantom"]' >> $GITHUB_OUTPUT
           fi
 
   build-linux-x64:
@@ -125,6 +130,7 @@ jobs:
           rm -f engine.tar.xz
 
       - name: Apply Pruning & Domain Neutralization
+        if: ${{ matrix.edition != 'phantom' }}
         run: |
           cd engine-src
           python3 ../core-whitelist/utils/prune_binaries.py . ../core-whitelist/pruning.list
@@ -133,7 +139,11 @@ jobs:
       - name: Apply Core Runtime Patches (${{ matrix.edition }})
         run: |
           cd engine-src
-          if [ "${{ matrix.edition }}" = "sovereign" ]; then
+          if [ "${{ matrix.edition }}" = "phantom" ]; then
+            echo "[+] Configuring OmniForge Phantom Edition (Real Chromium Base + Pure C++ Stealth Armor)..."
+            grep -E "extra/fingerprint/|extra/bromite/.*fingerprint" ../core-whitelist/patches/series > ../core-whitelist/patches/series.phantom
+            mv ../core-whitelist/patches/series.phantom ../core-whitelist/patches/series
+          elif [ "${{ matrix.edition }}" = "sovereign" ]; then
             echo "[+] Configuring Pure Sovereign Edition (Filtering out extra/fingerprint patches)..."
             grep -v "extra/fingerprint/" ../core-whitelist/patches/series > ../core-whitelist/patches/series.sovereign
             mv ../core-whitelist/patches/series.sovereign ../core-whitelist/patches/series
@@ -175,17 +185,32 @@ jobs:
         run: |
           cd engine-src
           mkdir -p out/Default
-          cat ../core-whitelist/flags.gn > out/Default/args.gn
-          cat <<EOF >> out/Default/args.gn
-          is_official_build = false
-          is_debug = false
-          symbol_level = 0
-          blink_symbol_level = 0
-          is_component_build = false
-          use_lld = true
-          proprietary_codecs = true
-          ffmpeg_branding = "Chrome"
-          EOF
+          if [ "${{ matrix.edition }}" = "phantom" ]; then
+            echo "[+] Generating clean standard Chromium GN args for Phantom Edition..."
+            printf "%s\n" \
+              "is_official_build = false" \
+              "is_debug = false" \
+              "symbol_level = 0" \
+              "blink_symbol_level = 0" \
+              "is_component_build = false" \
+              "use_lld = true" \
+              "proprietary_codecs = true" \
+              "ffmpeg_branding = \"Chrome\"" \
+              "treat_warnings_as_errors = false" \
+              "clang_use_chrome_plugins = false" \
+              "chrome_pgo_phase = 0" > out/Default/args.gn
+          else
+            cat ../core-whitelist/flags.gn > out/Default/args.gn
+            printf "%s\n" \
+              "is_official_build = false" \
+              "is_debug = false" \
+              "symbol_level = 0" \
+              "blink_symbol_level = 0" \
+              "is_component_build = false" \
+              "use_lld = true" \
+              "proprietary_codecs = true" \
+              "ffmpeg_branding = \"Chrome\"" >> out/Default/args.gn
+          fi
           mkdir -p buildtools/linux64
           ln -sf /usr/local/bin/gn buildtools/linux64/gn
           gn gen out/Default
@@ -255,8 +280,8 @@ jobs:
           ./chrome --headless=new --no-sandbox --disable-gpu --dump-dom "about:blank" > /tmp/dom_test.html
           test -s /tmp/dom_test.html && echo "[✔] Headless DOM render verified." || { echo "[-] Headless render empty!"; exit 1; }
 
-          if [ "${{ matrix.edition }}" = "agentic" ]; then
-            echo "[Gate 4: Agentic Stealth Invariant Gate]"
+          if [ "${{ matrix.edition }}" = "agentic" ] || [ "${{ matrix.edition }}" = "phantom" ]; then
+            echo "[Gate 4: Stealth Evasion Invariant Gate]"
             ./chrome --headless=new --no-sandbox --disable-gpu \
               --fingerprint-platform="win" \
               --fingerprint-hardware-concurrency=16 \
@@ -327,13 +352,17 @@ jobs:
             Autonomous web runtime engineered for high-resilience execution and distributed agentic cloud workloads.
             
             ### Included Release Flavors:
-            - **OmniForge Agentic Edition** (`omniforge-agentic-...`): Full C++ stealth evasion, fingerprint controls, and CDP automation masking for AI web agents.
+            - **OmniForge Phantom Edition** (`omniforge-phantom-...`): Real Chromium upstream foundation + Full C++ Stealth Evasion Armor (CDP automation masking, canvas/webgl noise, fingerprint protection) retaining standard web capabilities.
+            - **OmniForge Agentic Edition** (`omniforge-agentic-...`): Full C++ stealth evasion, fingerprint controls, and CDP automation masking for AI web agents (Ungoogled base).
             - **OmniForge Sovereign Edition** (`omniforge-sovereign-...`): Pure ungoogled privacy-first runtime, zero telemetry, Google domain neutralization.
             
             ### Quick Install (Linux VPS):
             ```bash
-            # Install Agentic Edition (Default)
-            curl -sSL https://raw.githubusercontent.com/howtosecu/OmniForge/main/scripts/install.sh | sudo bash
+            # Install Phantom Edition (Recommended for Enterprise & Anti-Bot Evasion)
+            curl -sSL https://raw.githubusercontent.com/howtosecu/OmniForge/main/scripts/install.sh | EDITION=phantom sudo bash
+            
+            # Or Install Agentic Edition
+            curl -sSL https://raw.githubusercontent.com/howtosecu/OmniForge/main/scripts/install.sh | EDITION=agentic sudo bash
             
             # Or Install Sovereign Edition
             curl -sSL https://raw.githubusercontent.com/howtosecu/OmniForge/main/scripts/install.sh | EDITION=sovereign sudo bash
