@@ -106,7 +106,8 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             build-essential ninja-build python3-pkg-resources \
             bison gperf flex libglib2.0-dev libnss3-dev libcups2-dev \
-            libxss-dev libasound2-dev libpci-dev libxkbcommon-dev libgbm-dev
+            libxss-dev libasound2-dev libpci-dev libxkbcommon-dev libgbm-dev \
+            libwayland-bin libwayland-dev wayland-protocols
 
           echo "[+] Installing modern Google CIPD GN binary..."
           curl -fSL "https://chrome-infra-packages.appspot.com/dl/gn/gn/linux-amd64/+/latest" -o gn.zip
@@ -370,6 +371,28 @@ jobs:
           # Sync any generated files from out/Default/gen to search paths
           find out/Default/gen -name "registered_field_trials.h" -exec cp -f {} third_party/webrtc/experiments/ \; 2>/dev/null || true
           find out/Default/gen -name "registered_field_trials.h" -exec cp -f {} out/Default/gen/experiments/ \; 2>/dev/null || true
+
+          echo "[+] Resolving generated header dependencies for Wayland protocols..."
+          ninja -C out/Default third_party/wayland-protocols:text_input_extension_protocol || true
+          ninja -C out/Default third_party/wayland-protocols:text_input_protocol || true
+          ninja -C out/Default ui/base/wayland:wayland_client_input_types || true
+
+          XML_FILE=$(find third_party/wayland-protocols -name "text-input-extension-unstable-v1.xml" 2>/dev/null | head -n 1)
+          if [ -n "$XML_FILE" ] && command -v wayland-scanner &> /dev/null; then
+            echo "[+] Generating Wayland text-input-extension header via wayland-scanner..."
+            mkdir -p out/Default/gen/third_party/wayland-protocols
+            mkdir -p out/Default/gen
+            mkdir -p ui/base/wayland
+            wayland-scanner client-header "$XML_FILE" out/Default/gen/third_party/wayland-protocols/text-input-extension-unstable-v1-client-protocol.h 2>/dev/null || true
+            wayland-scanner client-header "$XML_FILE" out/Default/gen/text-input-extension-unstable-v1-client-protocol.h 2>/dev/null || true
+            wayland-scanner client-header "$XML_FILE" ui/base/wayland/text-input-extension-unstable-v1-client-protocol.h 2>/dev/null || true
+          fi
+
+          mkdir -p out/Default/gen/third_party/wayland-protocols
+          mkdir -p ui/base/wayland
+          find out/Default/gen -name "*protocol.h" -exec cp -f {} out/Default/gen/third_party/wayland-protocols/ \; 2>/dev/null || true
+          find out/Default/gen -name "*protocol.h" -exec cp -f {} out/Default/gen/ \; 2>/dev/null || true
+          find out/Default/gen -name "*protocol.h" -exec cp -f {} ui/base/wayland/ \; 2>/dev/null || true
 
           if [ -f third_party/node/check_version.js ]; then
             echo "process.exit(0);" > third_party/node/check_version.js
