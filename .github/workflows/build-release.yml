@@ -115,8 +115,8 @@ jobs:
           rm -f gn.zip
           gn --version
 
-          echo "[+] Installing esbuild and frontend build utilities..."
-          sudo npm install -g esbuild rollup
+          echo "[+] Installing esbuild (matched v0.25.1) and frontend build utilities..."
+          sudo npm install -g esbuild@0.25.1 rollup
           esbuild --version
 
       - name: Download Engine Source Tarball
@@ -171,7 +171,19 @@ jobs:
           cp $(which node) third_party/node/linux/node-linux-x64/bin/node
           ./third_party/node/linux/node-linux-x64/bin/node -v
 
-          echo "[+] Deploying system esbuild into Chromium third_party tree..."
+          echo "[+] Detecting required esbuild version from devtools-frontend..."
+          ESBUILD_VER="0.25.1"
+          if [ -f "third_party/devtools-frontend/src/node_modules/esbuild/package.json" ]; then
+            DETECTED_VER=$(node -p "require('./third_party/devtools-frontend/src/node_modules/esbuild/package.json').version" 2>/dev/null || true)
+            if [ -n "$DETECTED_VER" ]; then
+              ESBUILD_VER="$DETECTED_VER"
+            fi
+          fi
+          echo "[+] Deploying exact matched esbuild (v${ESBUILD_VER}) into Chromium third_party tree..."
+          CURRENT_VER=$(esbuild --version 2>/dev/null || true)
+          if [ "$CURRENT_VER" != "$ESBUILD_VER" ]; then
+            sudo npm install -g "esbuild@${ESBUILD_VER}"
+          fi
           mkdir -p third_party/devtools-frontend/src/third_party/esbuild
           cp $(which esbuild) third_party/devtools-frontend/src/third_party/esbuild/esbuild
           ./third_party/devtools-frontend/src/third_party/esbuild/esbuild --version
