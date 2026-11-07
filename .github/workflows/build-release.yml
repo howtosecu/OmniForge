@@ -110,6 +110,10 @@ jobs:
           rm -f gn.zip
           gn --version
 
+          echo "[+] Installing esbuild and frontend build utilities..."
+          sudo npm install -g esbuild rollup
+          esbuild --version
+
       - name: Download Engine Source Tarball
         run: |
           VERSION="${{ inputs.version || '148.0.7778.215' }}"
@@ -156,6 +160,12 @@ jobs:
           mkdir -p third_party/node/linux/node-linux-x64/bin
           ln -sf $(which node) third_party/node/linux/node-linux-x64/bin/node
           ./third_party/node/linux/node-linux-x64/bin/node -v
+
+          echo "[+] Linking system esbuild into Chromium third_party tree..."
+          mkdir -p third_party/devtools-frontend/src/third_party/esbuild
+          ln -sf $(which esbuild) third_party/devtools-frontend/src/third_party/esbuild/esbuild
+          chmod +x third_party/devtools-frontend/src/third_party/esbuild/esbuild
+          ./third_party/devtools-frontend/src/third_party/esbuild/esbuild --version
 
       - name: Configure GN Compilation Arguments
         run: |
