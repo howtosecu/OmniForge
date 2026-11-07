@@ -141,7 +141,7 @@ jobs:
           cd engine-src
           if [ "${{ matrix.edition }}" = "phantom" ]; then
             echo "[+] Configuring OmniForge Phantom Edition (Real Chromium Base + Pure C++ Stealth Armor)..."
-            grep -E "extra/fingerprint/|extra/bromite/.*fingerprint" ../core-whitelist/patches/series > ../core-whitelist/patches/series.phantom
+            grep -E "extra/fingerprint/|extra/bromite/.*fingerprint|add-components-ungoogled|add-ungoogled-flag-headers" ../core-whitelist/patches/series > ../core-whitelist/patches/series.phantom
             mv ../core-whitelist/patches/series.phantom ../core-whitelist/patches/series
           elif [ "${{ matrix.edition }}" = "sovereign" ]; then
             echo "[+] Configuring Pure Sovereign Edition (Filtering out extra/fingerprint patches)..."
