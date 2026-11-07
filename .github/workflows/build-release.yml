@@ -141,6 +141,7 @@ jobs:
       - name: Setup Hermetic Toolchains (Sysroot, Clang & Rust)
         run: |
           cd engine-src
+          export CDS_CLANG_BUCKET_OVERRIDE="https://commondatastorage.googleapis.com/chromium-browser-clang"
           export CDS_CLANG_BUCKET_URL="https://commondatastorage.googleapis.com/chromium-browser-clang"
           echo "[+] Installing hermetic Debian sysroot..."
           python3 build/linux/sysroot_scripts/install-sysroot.py --arch=amd64
