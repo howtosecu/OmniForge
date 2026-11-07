@@ -215,7 +215,8 @@ jobs:
               "ffmpeg_branding = \"Chrome\"" \
               "treat_warnings_as_errors = false" \
               "clang_use_chrome_plugins = false" \
-              "chrome_pgo_phase = 0" > out/Default/args.gn
+              "chrome_pgo_phase = 0" \
+              "enable_perfetto_ipc = false" > out/Default/args.gn
           else
             cat ../core-whitelist/flags.gn > out/Default/args.gn
             printf "%s\n" \
@@ -226,7 +227,8 @@ jobs:
               "is_component_build = false" \
               "use_lld = true" \
               "proprietary_codecs = true" \
-              "ffmpeg_branding = \"Chrome\"" >> out/Default/args.gn
+              "ffmpeg_branding = \"Chrome\"" \
+              "enable_perfetto_ipc = false" >> out/Default/args.gn
           fi
           mkdir -p buildtools/linux64
           ln -sf /usr/local/bin/gn buildtools/linux64/gn
@@ -276,6 +278,8 @@ jobs:
           fi
 
           echo "[+] Resolving generated header dependencies for Perfetto IPC & Wire Protocol..."
+          ninja -C out/Default third_party/perfetto/protos/perfetto/ipc:ipc || true
+          ninja -C out/Default third_party/perfetto/protos/perfetto/ipc:wire_protocol || true
           ninja -C out/Default third_party/perfetto/protos/perfetto/ipc:wire_protocol_cpp || true
           ninja -C out/Default third_party/perfetto/protos/perfetto/ipc:wire_protocol_zero || true
           ninja -C out/Default third_party/perfetto/protos/perfetto/ipc:cpp || true
@@ -283,12 +287,21 @@ jobs:
           ninja -C out/Default gen/third_party/perfetto/protos/perfetto/ipc/wire_protocol.pbzero.h || true
 
           mkdir -p out/Default/gen/protos/perfetto/ipc
+          mkdir -p protos/perfetto/ipc
           mkdir -p third_party/perfetto/protos/perfetto/ipc
-          find out/Default/gen -name "*wire_protocol.gen.*" -exec cp {} out/Default/gen/protos/perfetto/ipc/ \; 2>/dev/null || true
-          find out/Default/gen -name "*wire_protocol.gen.*" -exec cp {} third_party/perfetto/protos/perfetto/ipc/ \; 2>/dev/null || true
+          find out/Default/gen -name "*.gen.h" -exec cp -f {} third_party/perfetto/protos/perfetto/ipc/ \; 2>/dev/null || true
+          find out/Default/gen -name "*.ipc.h" -exec cp -f {} third_party/perfetto/protos/perfetto/ipc/ \; 2>/dev/null || true
+          find out/Default/gen -name "*.pb.h" -exec cp -f {} third_party/perfetto/protos/perfetto/ipc/ \; 2>/dev/null || true
+          find out/Default/gen -name "*.gen.h" -exec cp -f {} protos/perfetto/ipc/ \; 2>/dev/null || true
+          find out/Default/gen -name "*.ipc.h" -exec cp -f {} protos/perfetto/ipc/ \; 2>/dev/null || true
+          find out/Default/gen -name "*.pb.h" -exec cp -f {} protos/perfetto/ipc/ \; 2>/dev/null || true
+          find out/Default/gen -name "*.gen.h" -exec cp -f {} out/Default/gen/protos/perfetto/ipc/ \; 2>/dev/null || true
+          find out/Default/gen -name "*.ipc.h" -exec cp -f {} out/Default/gen/protos/perfetto/ipc/ \; 2>/dev/null || true
+          find out/Default/gen -name "*.pb.h" -exec cp -f {} out/Default/gen/protos/perfetto/ipc/ \; 2>/dev/null || true
           if [ -d "out/Default/gen/third_party/perfetto/protos/perfetto/ipc" ]; then
-            cp -r out/Default/gen/third_party/perfetto/protos/perfetto/ipc/* out/Default/gen/protos/perfetto/ipc/ 2>/dev/null || true
-            cp -r out/Default/gen/third_party/perfetto/protos/perfetto/ipc/* third_party/perfetto/protos/perfetto/ipc/ 2>/dev/null || true
+            cp -rf out/Default/gen/third_party/perfetto/protos/perfetto/ipc/* out/Default/gen/protos/perfetto/ipc/ 2>/dev/null || true
+            cp -rf out/Default/gen/third_party/perfetto/protos/perfetto/ipc/* protos/perfetto/ipc/ 2>/dev/null || true
+            cp -rf out/Default/gen/third_party/perfetto/protos/perfetto/ipc/* third_party/perfetto/protos/perfetto/ipc/ 2>/dev/null || true
           fi
 
           echo "[+] Resolving generated header dependencies for Rust CXX bridges..."
