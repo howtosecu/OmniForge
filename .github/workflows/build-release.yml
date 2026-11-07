@@ -99,9 +99,16 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            build-essential clang lld ninja-build gn python3-pkg-resources \
+            build-essential ninja-build python3-pkg-resources \
             bison gperf flex libglib2.0-dev libnss3-dev libcups2-dev \
             libxss-dev libasound2-dev libpci-dev libxkbcommon-dev libgbm-dev
+
+          echo "[+] Installing modern Google CIPD GN binary..."
+          curl -fSL "https://chrome-infra-packages.appspot.com/dl/gn/gn/linux-amd64/+/latest" -o gn.zip
+          sudo unzip -o gn.zip gn -d /usr/local/bin/
+          sudo chmod +x /usr/local/bin/gn
+          rm -f gn.zip
+          gn --version
 
       - name: Download Engine Source Tarball
         run: |
@@ -131,6 +138,18 @@ jobs:
           fi
           python3 ../core-whitelist/utils/patches.py apply --continue-on-fail . ../core-whitelist/patches
 
+      - name: Setup Hermetic Toolchains (Sysroot, Clang & Rust)
+        run: |
+          cd engine-src
+          echo "[+] Installing hermetic Debian sysroot..."
+          python3 build/linux/sysroot_scripts/install-sysroot.py --arch=amd64
+
+          echo "[+] Installing Chromium Clang compiler..."
+          python3 tools/clang/scripts/update.py
+
+          echo "[+] Installing Chromium Rust toolchain..."
+          python3 tools/rust/update_rust.py || true
+
       - name: Configure GN Compilation Arguments
         run: |
           cd engine-src
@@ -147,7 +166,7 @@ jobs:
           ffmpeg_branding = "Chrome"
           EOF
           mkdir -p buildtools/linux64
-          ln -sf /usr/bin/gn buildtools/linux64/gn
+          ln -sf /usr/local/bin/gn buildtools/linux64/gn
           gn gen out/Default
 
       - name: Compile OmniForge Binary (Ninja)
@@ -192,9 +211,12 @@ jobs:
           PKG_NAME="omniforge-${EDITION}-${VERSION}-linux-x86_64"
           mkdir -p package/${PKG_NAME}
           cp -r engine-src/out/Default/chrome package/${PKG_NAME}/omniforge
+          cp -r engine-src/out/Default/chrome_crashpad_handler package/${PKG_NAME}/ 2>/dev/null || true
           cp -r engine-src/out/Default/*.so package/${PKG_NAME}/ 2>/dev/null || true
+          cp -r engine-src/out/Default/*.pak package/${PKG_NAME}/ 2>/dev/null || true
+          cp -r engine-src/out/Default/*.bin package/${PKG_NAME}/ 2>/dev/null || true
+          cp -r engine-src/out/Default/*.dat package/${PKG_NAME}/ 2>/dev/null || true
           cp -r engine-src/out/Default/locales package/${PKG_NAME}/
-          cp -r engine-src/out/Default/resources.pak package/${PKG_NAME}/
           tar -cJf "${PKG_NAME}.tar.xz" -C package "${PKG_NAME}"
           sha256sum "${PKG_NAME}.tar.xz" > "${PKG_NAME}.tar.xz.sha256"
 
