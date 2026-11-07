@@ -355,15 +355,14 @@ jobs:
 
           # Fallback definition if header is still missing
           if [ ! -f out/Default/gen/third_party/webrtc/experiments/registered_field_trials.h ] && [ ! -f third_party/webrtc/experiments/registered_field_trials.h ]; then
-            cat << 'EOF' > third_party/webrtc/experiments/registered_field_trials.h
-#ifndef GEN_REGISTERED_FIELD_TRIALS_H_
-#define GEN_REGISTERED_FIELD_TRIALS_H_
-#include "absl/strings/string_view.h"
-namespace webrtc {
-inline constexpr absl::string_view kRegisteredFieldTrials[] = { "" };
-} // namespace webrtc
-#endif // GEN_REGISTERED_FIELD_TRIALS_H_
-EOF
+            printf "%s\n" \
+              "#ifndef GEN_REGISTERED_FIELD_TRIALS_H_" \
+              "#define GEN_REGISTERED_FIELD_TRIALS_H_" \
+              "#include \"absl/strings/string_view.h\"" \
+              "namespace webrtc {" \
+              "inline constexpr absl::string_view kRegisteredFieldTrials[] = { \"\" };" \
+              "} // namespace webrtc" \
+              "#endif // GEN_REGISTERED_FIELD_TRIALS_H_" > third_party/webrtc/experiments/registered_field_trials.h
             cp -f third_party/webrtc/experiments/registered_field_trials.h out/Default/gen/third_party/webrtc/experiments/registered_field_trials.h 2>/dev/null || true
             cp -f third_party/webrtc/experiments/registered_field_trials.h out/Default/gen/experiments/registered_field_trials.h 2>/dev/null || true
           fi
