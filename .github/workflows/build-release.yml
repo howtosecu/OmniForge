@@ -166,6 +166,11 @@ jobs:
           cp $(which esbuild) third_party/devtools-frontend/src/third_party/esbuild/esbuild
           ./third_party/devtools-frontend/src/third_party/esbuild/esbuild --version
 
+          echo "[+] Deploying system gperf into Chromium third_party tree..."
+          mkdir -p third_party/gperf/cipd/bin
+          cp $(which gperf) third_party/gperf/cipd/bin/gperf
+          ./third_party/gperf/cipd/bin/gperf --version
+
       - name: Configure GN Compilation Arguments
         run: |
           cd engine-src
