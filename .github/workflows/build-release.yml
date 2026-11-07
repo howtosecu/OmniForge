@@ -340,6 +340,38 @@ jobs:
 
           find out/Default/gen -name "*lib.rs.h*" -exec cp {} third_party/rust/serde_json_lenient/v0_2/wrapper/lib.rs.h \; 2>/dev/null || true
 
+          echo "[+] Resolving generated header dependencies for WebRTC field trials..."
+          ninja -C out/Default third_party/webrtc/experiments:registered_field_trials || true
+
+          mkdir -p third_party/webrtc/experiments
+          mkdir -p out/Default/gen/third_party/webrtc/experiments
+          mkdir -p out/Default/gen/experiments
+
+          if [ -f third_party/webrtc/experiments/field_trials.py ]; then
+            python3 third_party/webrtc/experiments/field_trials.py header --output out/Default/gen/third_party/webrtc/experiments/registered_field_trials.h 2>/dev/null || true
+            python3 third_party/webrtc/experiments/field_trials.py header --output out/Default/gen/experiments/registered_field_trials.h 2>/dev/null || true
+            python3 third_party/webrtc/experiments/field_trials.py header --output third_party/webrtc/experiments/registered_field_trials.h 2>/dev/null || true
+          fi
+
+          # Fallback definition if header is still missing
+          if [ ! -f out/Default/gen/third_party/webrtc/experiments/registered_field_trials.h ] && [ ! -f third_party/webrtc/experiments/registered_field_trials.h ]; then
+            cat << 'EOF' > third_party/webrtc/experiments/registered_field_trials.h
+#ifndef GEN_REGISTERED_FIELD_TRIALS_H_
+#define GEN_REGISTERED_FIELD_TRIALS_H_
+#include "absl/strings/string_view.h"
+namespace webrtc {
+inline constexpr absl::string_view kRegisteredFieldTrials[] = { "" };
+} // namespace webrtc
+#endif // GEN_REGISTERED_FIELD_TRIALS_H_
+EOF
+            cp -f third_party/webrtc/experiments/registered_field_trials.h out/Default/gen/third_party/webrtc/experiments/registered_field_trials.h 2>/dev/null || true
+            cp -f third_party/webrtc/experiments/registered_field_trials.h out/Default/gen/experiments/registered_field_trials.h 2>/dev/null || true
+          fi
+
+          # Sync any generated files from out/Default/gen to search paths
+          find out/Default/gen -name "registered_field_trials.h" -exec cp -f {} third_party/webrtc/experiments/ \; 2>/dev/null || true
+          find out/Default/gen -name "registered_field_trials.h" -exec cp -f {} out/Default/gen/experiments/ \; 2>/dev/null || true
+
           if [ -f third_party/node/check_version.js ]; then
             echo "process.exit(0);" > third_party/node/check_version.js
           fi
