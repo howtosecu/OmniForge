@@ -270,6 +270,32 @@ jobs:
             cp out/Default/gen/third_party/perfetto/src/trace_processor/tables/all_tables_fwd.h out/Default/gen/src/trace_processor/tables/
           fi
 
+          echo "[+] Resolving generated header dependencies for Rust CXX bridges..."
+          ninja -C out/Default third_party/rust/serde_json_lenient/v0_2/wrapper:wrapper || \
+          ninja -C out/Default third_party/rust/serde_json_lenient/v0_2/wrapper || true
+          ninja -C out/Default base/logging/rust_logger || true
+
+          mkdir -p out/Default/gen/third_party/rust/serde_json_lenient/v0_2/wrapper
+          mkdir -p third_party/rust/serde_json_lenient/v0_2/wrapper
+
+          if [ ! -f "out/Default/gen/third_party/rust/serde_json_lenient/v0_2/wrapper/lib.rs.h" ]; then
+            echo "[+] Generating serde_json_lenient cxxbridge header via hermetic toolchain..."
+            CXXBRIDGE_BIN="third_party/rust-toolchain/bin/cxxbridge"
+            if [ -x "$CXXBRIDGE_BIN" ] && [ -f "third_party/rust/serde_json_lenient/v0_2/wrapper/lib.rs" ]; then
+              $CXXBRIDGE_BIN third_party/rust/serde_json_lenient/v0_2/wrapper/lib.rs --header > out/Default/gen/third_party/rust/serde_json_lenient/v0_2/wrapper/lib.rs.h 2>/dev/null || true
+            fi
+          fi
+
+          if [ -f "out/Default/gen/third_party/rust/serde_json_lenient/v0_2/wrapper/lib.rs.h" ]; then
+            echo "[✔] serde_json_lenient lib.rs.h verified. Synchronizing across include search paths..."
+            cp out/Default/gen/third_party/rust/serde_json_lenient/v0_2/wrapper/lib.rs.h third_party/rust/serde_json_lenient/v0_2/wrapper/ 2>/dev/null || true
+          fi
+
+          if [ -f "out/Default/gen/base/logging/rust_logger/lib.rs.h" ]; then
+            mkdir -p base/logging/rust_logger
+            cp out/Default/gen/base/logging/rust_logger/lib.rs.h base/logging/rust_logger/ 2>/dev/null || true
+          fi
+
           echo "[+] Starting main Chrome binary compilation..."
           ninja -C out/Default chrome
 
