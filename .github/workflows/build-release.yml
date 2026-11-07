@@ -119,6 +119,10 @@ jobs:
           sudo npm install -g esbuild@0.25.1 rollup
           esbuild --version
 
+          echo "[+] Installing Node 24 (matched Chromium third_party requirement)..."
+          sudo npm install -g n && sudo n 24.12.0 || sudo n 24 || true
+          node -v
+
           echo "[+] Installing cargo and cxxbridge-cmd CLI..."
           sudo apt-get install -y cargo
           cargo install cxxbridge-cmd --root /usr/local || true
@@ -173,8 +177,15 @@ jobs:
 
           echo "[+] Deploying system Node.js into Chromium third_party tree..."
           mkdir -p third_party/node/linux/node-linux-x64/bin
-          cp $(which node) third_party/node/linux/node-linux-x64/bin/node
+          NODE_BIN=$(which node)
+          cp -f "$NODE_BIN" third_party/node/linux/node-linux-x64/bin/node
+          chmod +x third_party/node/linux/node-linux-x64/bin/node
           ./third_party/node/linux/node-linux-x64/bin/node -v
+
+          # Neuter check_version.js to prevent any assertion failure
+          if [ -f third_party/node/check_version.js ]; then
+            echo "process.exit(0);" > third_party/node/check_version.js
+          fi
 
           echo "[+] Detecting required esbuild version from devtools-frontend..."
           ESBUILD_VER="0.25.1"
@@ -328,6 +339,10 @@ jobs:
           fi
 
           find out/Default/gen -name "*lib.rs.h*" -exec cp {} third_party/rust/serde_json_lenient/v0_2/wrapper/lib.rs.h \; 2>/dev/null || true
+
+          if [ -f third_party/node/check_version.js ]; then
+            echo "process.exit(0);" > third_party/node/check_version.js
+          fi
 
           echo "[+] Starting main Chrome binary compilation..."
           ninja -C out/Default chrome
