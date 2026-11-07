@@ -1,0 +1,186 @@
+name: OmniForge Engine Build Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Chromium Base Version (e.g. 148.0.7778.215)"
+        required: true
+        default: "148.0.7778.215"
+      release_tag:
+        description: "Release Tag Version (e.g. v1.0.0)"
+        required: true
+        default: "v1.0.0"
+      dry_run:
+        description: "Dry run (test patch validation without full compilation)"
+        required: false
+        type: boolean
+        default: false
+
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux-x64:
+    name: Build Linux x86_64
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Maximize Runner Disk Space
+        run: |
+          echo "Initial disk space:"
+          df -h
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache
+          sudo docker image prune -a --force || true
+          echo "Disk space after cleanup:"
+          df -h
+
+      - name: Air-Gapped Whitelist Checkout from Upstream Engine Core
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ secrets.CORE_REPO }}
+          ref: ${{ secrets.CORE_REF || 'main' }}
+          token: ${{ secrets.CORE_TOKEN }}
+          persist-credentials: false
+          sparse-checkout: |
+            patches
+            utils
+            flags.gn
+            downloads.ini
+            pruning.list
+            domain_substitution.list
+          sparse-checkout-cone-mode: false
+          path: core-whitelist
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install System Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential clang lld ninja-build python3-pkg-resources \
+            bison gperf flex libglib2.0-dev libnss3-dev libcups2-dev \
+            libxss-dev libasound2-dev libpci-dev libxkbcommon-dev libgbm-dev
+
+      - name: Download Engine Source Tarball
+        run: |
+          VERSION="${{ inputs.version || '148.0.7778.215' }}"
+          echo "Downloading engine source tarball v${VERSION}..."
+          mkdir -p engine-src
+          URL="https://commondatastorage.googleapis.com/chromium-browser-official/chromium-${VERSION}.tar.xz"
+          curl -fSL "$URL" -o engine.tar.xz
+          tar -xf engine.tar.xz --strip-components=1 -C engine-src
+          rm -f engine.tar.xz
+
+      - name: Apply Pruning & Domain Neutralization
+        run: |
+          cd engine-src
+          python3 ../core-whitelist/utils/prune_binaries.py . ../core-whitelist/pruning.list
+          python3 ../core-whitelist/utils/domain_substitution.py apply -r ../core-whitelist/domain_substitution.list -c ../domsubcache.tar.gz .
+
+      - name: Apply Core Runtime Patches
+        run: |
+          cd engine-src
+          python3 ../core-whitelist/utils/patches.py apply -p ../core-whitelist/patches .
+
+      - name: Configure GN Compilation Arguments
+        run: |
+          cd engine-src
+          mkdir -p out/Default
+          cat ../core-whitelist/flags.gn > out/Default/args.gn
+          cat <<EOF >> out/Default/args.gn
+          is_official_build = false
+          is_debug = false
+          symbol_level = 0
+          blink_symbol_level = 0
+          is_component_build = false
+          use_lld = true
+          proprietary_codecs = true
+          ffmpeg_branding = "Chrome"
+          EOF
+
+      - name: Compile OmniForge Binary (Ninja)
+        if: ${{ !(inputs.dry_run) }}
+        run: |
+          cd engine-src
+          ninja -C out/Default chrome
+
+      - name: Package Linux Binary Artifact
+        if: ${{ !(inputs.dry_run) }}
+        run: |
+          VERSION="${{ inputs.version || '148.0.7778.215' }}"
+          PKG_NAME="omniforge-${VERSION}-linux-x86_64"
+          mkdir -p package/${PKG_NAME}
+          cp -r engine-src/out/Default/chrome package/${PKG_NAME}/omniforge
+          cp -r engine-src/out/Default/*.so package/${PKG_NAME}/ 2>/dev/null || true
+          cp -r engine-src/out/Default/locales package/${PKG_NAME}/
+          cp -r engine-src/out/Default/resources.pak package/${PKG_NAME}/
+          tar -cJf "${PKG_NAME}.tar.xz" -C package "${PKG_NAME}"
+          sha256sum "${PKG_NAME}.tar.xz" > "${PKG_NAME}.tar.xz.sha256"
+
+      - name: Upload Linux Build Artifact
+        if: ${{ !(inputs.dry_run) }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-x86_64-package
+          path: |
+            *.tar.xz
+            *.sha256
+
+  publish-github-release:
+    name: Publish Official Release & Checksums
+    needs: build-linux-x64
+    if: always() && !(inputs.dry_run) && (inputs.release_tag != '' || startsWith(github.ref, 'refs/tags/'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all compiled artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: Compute Cryptographic SHA-256 Checksums
+        run: |
+          mkdir -p dist
+          find release-artifacts -type f \( -name "*.tar.xz" -o -name "*.zip" -o -name "*.AppImage" -o -name "*.exe" \) -exec cp {} dist/ \;
+          cd dist
+          if [ "$(ls -A .)" ]; then
+            sha256sum * > SHA256SUMS.txt
+            echo "### Release Checksums (SHA-256)" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            cat SHA256SUMS.txt >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Publish Official GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: hashFiles('dist/*') != ''
+        with:
+          tag_name: ${{ inputs.release_tag || github.ref_name }}
+          name: "OmniForge Release ${{ inputs.release_tag || github.ref_name }}"
+          body: |
+            ## ⚡ OmniForge Official Production Release
+            
+            Autonomous web runtime engineered for high-resilience execution and distributed agentic cloud workloads.
+            
+            ### Quick Install (Linux VPS):
+            ```bash
+            curl -sSL https://raw.githubusercontent.com/howtosecu/OmniForge/main/scripts/install.sh | sudo bash
+            ```
+            
+            ### Quick Install (Windows):
+            ```powershell
+            powershell -ExecutionPolicy Bypass -Command "iwr -useb https://raw.githubusercontent.com/howtosecu/OmniForge/main/scripts/install.ps1 | iex"
+            ```
+          draft: false
+          prerelease: false
+          files: dist/*
