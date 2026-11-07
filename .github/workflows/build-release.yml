@@ -34,14 +34,31 @@ permissions:
   contents: write
 
 jobs:
+  prepare-matrix:
+    name: Determine Build Matrix Flavors
+    runs-on: ubuntu-latest
+    outputs:
+      editions: ${{ steps.set-matrix.outputs.editions }}
+    steps:
+      - id: set-matrix
+        run: |
+          CHOICE="${{ inputs.edition || 'both' }}"
+          if [ "$CHOICE" = "agentic" ]; then
+            echo 'editions=["agentic"]' >> $GITHUB_OUTPUT
+          elif [ "$CHOICE" = "sovereign" ]; then
+            echo 'editions=["sovereign"]' >> $GITHUB_OUTPUT
+          else
+            echo 'editions=["agentic", "sovereign"]' >> $GITHUB_OUTPUT
+          fi
+
   build-linux-x64:
     name: Build Linux x86_64 (${{ matrix.edition }})
+    needs: prepare-matrix
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
-        edition: [agentic, sovereign]
-    if: ${{ inputs.edition == 'both' || inputs.edition == matrix.edition || inputs.edition == '' || startsWith(github.ref, 'refs/tags/') }}
+        edition: ${{ fromJson(needs.prepare-matrix.outputs.editions) }}
     steps:
       - name: Maximize Runner Disk Space
         run: |
