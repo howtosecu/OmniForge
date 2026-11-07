@@ -14,13 +14,21 @@ if [ "$ARCH" != "x86_64" ]; then
     exit 1
 fi
 
+EDITION="${EDITION:-agentic}"
 INSTALL_DIR="/opt/omniforge"
 BIN_LINK="/usr/local/bin/omniforge"
 
+echo "[+] Target edition: $EDITION"
 echo "[+] Querying latest release metadata from howtosecu/OmniForge..."
 LATEST_RELEASE_JSON=$(curl -sSL "https://api.github.com/repos/howtosecu/OmniForge/releases/latest" || true)
 
-DOWNLOAD_URL=$(echo "$LATEST_RELEASE_JSON" | grep -o 'https://[^"]*omniforge-[^"]*linux-x86_64\.tar\.xz' | head -n 1 || true)
+# Try matching specific edition first (e.g. omniforge-agentic-... or omniforge-sovereign-...)
+DOWNLOAD_URL=$(echo "$LATEST_RELEASE_JSON" | grep -o "https://[^\"]*omniforge-${EDITION}-[^\"]*linux-x86_64\.tar\.xz" | head -n 1 || true)
+
+if [ -z "$DOWNLOAD_URL" ]; then
+    # Fallback to any omniforge linux tar.xz asset
+    DOWNLOAD_URL=$(echo "$LATEST_RELEASE_JSON" | grep -o 'https://[^"]*omniforge-[^"]*linux-x86_64\.tar\.xz' | head -n 1 || true)
+fi
 
 if [ -z "$DOWNLOAD_URL" ]; then
     # Fallback to any linux tar.xz asset

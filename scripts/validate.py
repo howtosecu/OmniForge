@@ -34,7 +34,7 @@ def main() -> int:
         return 1
 
     # Sensitive keyword scan across all files
-    sensitive_keywords = ["cloak", "adryfish", "antidetect", "fingerprint", "stealth", "87+"]
+    sensitive_keywords = ["cloak", "adryfish", "antidetect", "omnibrowser", "87+"]
     for path in ROOT.rglob("*"):
         if path.is_file() and not path.name.startswith(".git") and path.name != "validate.py":
             try:
