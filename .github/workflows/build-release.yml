@@ -219,17 +219,16 @@ jobs:
             cp -r out/Default/gen/third_party/perfetto/src/trace_processor/tables/* out/Default/gen/src/trace_processor/tables/ 2>/dev/null || true
           else
             echo "[!] Using safe forward-declaration fallback for all_tables_fwd.h..."
-            cat <<'EOF' > out/Default/gen/third_party/perfetto/src/trace_processor/tables/all_tables_fwd.h
-#ifndef SRC_TRACE_PROCESSOR_TABLES_ALL_TABLES_FWD_H_
-#define SRC_TRACE_PROCESSOR_TABLES_ALL_TABLES_FWD_H_
-namespace perfetto {
-namespace trace_processor {
-namespace tables {
-} // namespace tables
-} // namespace trace_processor
-} // namespace perfetto
-#endif
-EOF
+            printf "%s\n" \
+              "#ifndef SRC_TRACE_PROCESSOR_TABLES_ALL_TABLES_FWD_H_" \
+              "#define SRC_TRACE_PROCESSOR_TABLES_ALL_TABLES_FWD_H_" \
+              "namespace perfetto {" \
+              "namespace trace_processor {" \
+              "namespace tables {" \
+              "} // namespace tables" \
+              "} // namespace trace_processor" \
+              "} // namespace perfetto" \
+              "#endif" > out/Default/gen/third_party/perfetto/src/trace_processor/tables/all_tables_fwd.h
             cp out/Default/gen/third_party/perfetto/src/trace_processor/tables/all_tables_fwd.h third_party/perfetto/src/trace_processor/tables/
             cp out/Default/gen/third_party/perfetto/src/trace_processor/tables/all_tables_fwd.h out/Default/gen/src/trace_processor/tables/
           fi
