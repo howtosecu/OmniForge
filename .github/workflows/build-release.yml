@@ -91,7 +91,7 @@ jobs:
       - name: Apply Core Runtime Patches
         run: |
           cd engine-src
-          python3 ../core-whitelist/utils/patches.py apply -p ../core-whitelist/patches .
+          python3 ../core-whitelist/utils/patches.py apply . ../core-whitelist/patches
 
       - name: Configure GN Compilation Arguments
         run: |
