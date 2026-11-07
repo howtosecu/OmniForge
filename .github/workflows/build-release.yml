@@ -99,7 +99,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            build-essential clang lld ninja-build python3-pkg-resources \
+            build-essential clang lld ninja-build gn python3-pkg-resources \
             bison gperf flex libglib2.0-dev libnss3-dev libcups2-dev \
             libxss-dev libasound2-dev libpci-dev libxkbcommon-dev libgbm-dev
 
@@ -146,6 +146,9 @@ jobs:
           proprietary_codecs = true
           ffmpeg_branding = "Chrome"
           EOF
+          mkdir -p buildtools/linux64
+          ln -sf /usr/bin/gn buildtools/linux64/gn
+          gn gen out/Default
 
       - name: Compile OmniForge Binary (Ninja)
         if: ${{ !(inputs.dry_run) }}
@@ -207,7 +210,7 @@ jobs:
   publish-github-release:
     name: Publish Official Release & Checksums
     needs: build-linux-x64
-    if: always() && !(inputs.dry_run) && (inputs.release_tag != '' || startsWith(github.ref, 'refs/tags/'))
+    if: success() && !(inputs.dry_run) && (inputs.release_tag != '' || startsWith(github.ref, 'refs/tags/'))
     runs-on: ubuntu-latest
     steps:
       - name: Download all compiled artifacts
@@ -218,7 +221,7 @@ jobs:
 
       - name: Compute Cryptographic SHA-256 Checksums
         run: |
-          mkdir -p dist
+          mkdir -p dist release-artifacts
           find release-artifacts -type f \( -name "*.tar.xz" -o -name "*.zip" -o -name "*.AppImage" -o -name "*.exe" \) -exec cp {} dist/ \;
           cd dist
           if [ "$(ls -A .)" ]; then
