@@ -120,6 +120,19 @@ jobs:
           tar -xf engine.tar.xz --strip-components=1 -C engine-src
           rm -f engine.tar.xz
 
+      - name: Setup Hermetic Toolchains (Sysroot, Clang & Rust)
+        run: |
+          cd engine-src
+          export CDS_CLANG_BUCKET_URL="https://commondatastorage.googleapis.com/chromium-browser-clang"
+          echo "[+] Installing hermetic Debian sysroot..."
+          python3 build/linux/sysroot_scripts/install-sysroot.py --arch=amd64
+
+          echo "[+] Installing Chromium Clang compiler..."
+          python3 tools/clang/scripts/update.py
+
+          echo "[+] Installing Chromium Rust toolchain..."
+          python3 tools/rust/update_rust.py || true
+
       - name: Apply Pruning & Domain Neutralization
         run: |
           cd engine-src
@@ -137,18 +150,6 @@ jobs:
             echo "[+] Configuring Agentic Stealth Edition (Applying full 124 patches including C++ fingerprint)..."
           fi
           python3 ../core-whitelist/utils/patches.py apply --continue-on-fail . ../core-whitelist/patches
-
-      - name: Setup Hermetic Toolchains (Sysroot, Clang & Rust)
-        run: |
-          cd engine-src
-          echo "[+] Installing hermetic Debian sysroot..."
-          python3 build/linux/sysroot_scripts/install-sysroot.py --arch=amd64
-
-          echo "[+] Installing Chromium Clang compiler..."
-          python3 tools/clang/scripts/update.py
-
-          echo "[+] Installing Chromium Rust toolchain..."
-          python3 tools/rust/update_rust.py || true
 
       - name: Configure GN Compilation Arguments
         run: |
