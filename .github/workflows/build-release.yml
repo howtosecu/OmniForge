@@ -221,13 +221,20 @@ jobs:
               "is_debug = false" \
               "symbol_level = 0" \
               "blink_symbol_level = 0" \
+              "v8_symbol_level = 0" \
               "is_component_build = false" \
               "use_lld = true" \
               "proprietary_codecs = true" \
               "ffmpeg_branding = \"Chrome\"" \
               "treat_warnings_as_errors = false" \
               "clang_use_chrome_plugins = false" \
-              "chrome_pgo_phase = 0" > out/Default/args.gn
+              "chrome_pgo_phase = 0" \
+              "enable_nacl = false" \
+              "enable_remoting = false" \
+              "enable_reporting = false" \
+              "safe_browsing_mode = 0" \
+              "enable_service_discovery = false" \
+              "use_debug_fission = false" > out/Default/args.gn
           else
             cat ../core-whitelist/flags.gn > out/Default/args.gn
             printf "%s\n" \
@@ -235,10 +242,17 @@ jobs:
               "is_debug = false" \
               "symbol_level = 0" \
               "blink_symbol_level = 0" \
+              "v8_symbol_level = 0" \
               "is_component_build = false" \
               "use_lld = true" \
               "proprietary_codecs = true" \
-              "ffmpeg_branding = \"Chrome\"" >> out/Default/args.gn
+              "ffmpeg_branding = \"Chrome\"" \
+              "enable_nacl = false" \
+              "enable_remoting = false" \
+              "enable_reporting = false" \
+              "safe_browsing_mode = 0" \
+              "enable_service_discovery = false" \
+              "use_debug_fission = false" >> out/Default/args.gn
           fi
           mkdir -p buildtools/linux64
           ln -sf /usr/local/bin/gn buildtools/linux64/gn
