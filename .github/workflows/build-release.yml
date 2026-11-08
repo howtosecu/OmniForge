@@ -232,8 +232,8 @@ jobs:
               "enable_nacl = false" \
               "enable_remoting = false" \
               "enable_reporting = false" \
-              "safe_browsing_mode = 0" \
               "enable_service_discovery = false" \
+              "enable_vr = false" \
               "use_debug_fission = false" > out/Default/args.gn
           else
             cat ../core-whitelist/flags.gn > out/Default/args.gn
@@ -250,8 +250,8 @@ jobs:
               "enable_nacl = false" \
               "enable_remoting = false" \
               "enable_reporting = false" \
-              "safe_browsing_mode = 0" \
               "enable_service_discovery = false" \
+              "enable_vr = false" \
               "use_debug_fission = false" >> out/Default/args.gn
           fi
           mkdir -p buildtools/linux64
