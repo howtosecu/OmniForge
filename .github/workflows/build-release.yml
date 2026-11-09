@@ -210,13 +210,20 @@ jobs:
           cp $(which gperf) third_party/gperf/cipd/bin/gperf
           ./third_party/gperf/cipd/bin/gperf --version
 
-      - name: Setup & Restore CCache
+      - name: Setup & Restore Build Cache (CCache & Ninja Targets)
         uses: actions/cache@v4
         with:
-          path: ~/.cache/ccache
-          key: ccache-${{ matrix.edition }}-${{ github.run_id }}
+          path: |
+            ~/.cache/ccache
+            engine-src/out/Default/obj
+            engine-src/out/Default/gen
+            engine-src/out/Default/.ninja_log
+            engine-src/out/Default/.ninja_deps
+          key: buildcache-${{ matrix.edition }}-${{ github.run_id }}
           restore-keys: |
+            buildcache-${{ matrix.edition }}-
             ccache-${{ matrix.edition }}-
+            buildcache-
             ccache-
 
       - name: Configure GN Compilation Arguments
@@ -278,6 +285,8 @@ jobs:
           export CCACHE_MAXSIZE="8G"
           export CCACHE_COMPRESS="1"
           export CCACHE_COMPRESSLEVEL="6"
+          export CCACHE_SLOPPINESS="include_file_ctime,include_file_mtime,time_macros"
+          export CCACHE_BASEDIR="$GITHUB_WORKSPACE"
           echo "[+] Initial CCache Status:"
           ccache -s
 
