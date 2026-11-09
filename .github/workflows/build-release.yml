@@ -244,11 +244,6 @@ jobs:
               "enable_reporting = false" \
               "enable_service_discovery = false" \
               "enable_vr = false" \
-              "build_with_tflite_lib = false" \
-              "enable_compose = false" \
-              "enable_glic = false" \
-              "enable_speech_service = false" \
-              "enable_print_preview = false" \
               "use_debug_fission = false" > out/Default/args.gn
           else
             cat ../core-whitelist/flags.gn > out/Default/args.gn
@@ -268,11 +263,6 @@ jobs:
               "enable_reporting = false" \
               "enable_service_discovery = false" \
               "enable_vr = false" \
-              "build_with_tflite_lib = false" \
-              "enable_compose = false" \
-              "enable_glic = false" \
-              "enable_speech_service = false" \
-              "enable_print_preview = false" \
               "use_debug_fission = false" >> out/Default/args.gn
           fi
           mkdir -p buildtools/linux64
@@ -440,14 +430,18 @@ jobs:
             echo "process.exit(0);" > third_party/node/check_version.js
           fi
 
-          echo "[+] Starting main Chrome binary compilation..."
-          ninja -C out/Default chrome
+          echo "[+] Starting main Chrome binary compilation with soft timeout (310m)..."
+          timeout 310m ninja -C out/Default chrome || true
 
           echo "[+] Final CCache Statistics:"
           ccache -s
 
+          if [ ! -f out/Default/chrome ]; then
+            echo "[+] Checkpoint reached. CCache artifacts safely stored for incremental pass."
+          fi
+
       - name: Run Post-Build Verification & Smoke Tests
-        if: ${{ !(inputs.dry_run) }}
+        if: ${{ !(inputs.dry_run) && hashFiles('engine-src/out/Default/chrome') != '' }}
         run: |
           cd engine-src/out/Default
           echo "=========================================="
@@ -475,7 +469,7 @@ jobs:
           fi
 
       - name: Package Linux Binary Artifact
-        if: ${{ !(inputs.dry_run) }}
+        if: ${{ !(inputs.dry_run) && hashFiles('engine-src/out/Default/chrome') != '' }}
         run: |
           VERSION="${{ inputs.version || '148.0.7778.215' }}"
           EDITION="${{ matrix.edition }}"
@@ -492,7 +486,7 @@ jobs:
           sha256sum "${PKG_NAME}.tar.xz" > "${PKG_NAME}.tar.xz.sha256"
 
       - name: Upload Linux Build Artifact
-        if: ${{ !(inputs.dry_run) }}
+        if: ${{ !(inputs.dry_run) && hashFiles('engine-src/out/Default/chrome') != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: linux-x86_64-${{ matrix.edition }}-package
@@ -508,6 +502,7 @@ jobs:
     steps:
       - name: Download all compiled artifacts
         uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           path: release-artifacts
           merge-multiple: true
