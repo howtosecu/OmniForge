@@ -226,6 +226,16 @@ jobs:
             buildcache-
             ccache-
 
+      - name: Touch Restored Ninja Artifacts
+        run: |
+          if [ -d "engine-src/out/Default/obj" ]; then
+            echo "[+] Updating mtime of restored Ninja objects..."
+            find engine-src/out/Default/obj -type f -exec touch {} + 2>/dev/null || true
+          fi
+          if [ -d "engine-src/out/Default/gen" ]; then
+            find engine-src/out/Default/gen -type f -exec touch {} + 2>/dev/null || true
+          fi
+
       - name: Configure GN Compilation Arguments
         run: |
           cd engine-src
@@ -246,6 +256,7 @@ jobs:
               "clang_use_chrome_plugins = false" \
               "chrome_pgo_phase = 0" \
               "cc_wrapper = \"ccache\"" \
+              "use_libcxx_modules = false" \
               "enable_nacl = false" \
               "enable_remoting = false" \
               "enable_reporting = false" \
@@ -265,6 +276,7 @@ jobs:
               "proprietary_codecs = true" \
               "ffmpeg_branding = \"Chrome\"" \
               "cc_wrapper = \"ccache\"" \
+              "use_libcxx_modules = false" \
               "enable_nacl = false" \
               "enable_remoting = false" \
               "enable_reporting = false" \
