@@ -375,12 +375,12 @@ jobs:
             cp -f out/Default/gen/base/logging/rust_logger/lib.rs.h base/logging/rust_logger/lib.rs.h 2>/dev/null || true
           fi
 
-          # Also copy generated header from gen/ if ninja produced it
           if [ -f "out/Default/gen/third_party/rust/serde_json_lenient/v0_2/wrapper/lib.rs.h" ]; then
             cp -f out/Default/gen/third_party/rust/serde_json_lenient/v0_2/wrapper/lib.rs.h third_party/rust/serde_json_lenient/v0_2/wrapper/lib.rs.h 2>/dev/null || true
           fi
-
-          find out/Default/gen -name "*lib.rs.h*" -exec cp {} third_party/rust/serde_json_lenient/v0_2/wrapper/lib.rs.h \; 2>/dev/null || true
+          if [ -f "out/Default/gen/base/logging/rust_logger/lib.rs.h" ]; then
+            cp -f out/Default/gen/base/logging/rust_logger/lib.rs.h base/logging/rust_logger/lib.rs.h 2>/dev/null || true
+          fi
 
           echo "[+] Resolving generated header dependencies for WebRTC field trials..."
           ninja -C out/Default third_party/webrtc/experiments:registered_field_trials || true
