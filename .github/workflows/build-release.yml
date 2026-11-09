@@ -107,7 +107,7 @@ jobs:
             build-essential ninja-build python3-pkg-resources \
             bison gperf flex libglib2.0-dev libnss3-dev libcups2-dev \
             libxss-dev libasound2-dev libpci-dev libxkbcommon-dev libgbm-dev \
-            libwayland-bin libwayland-dev wayland-protocols
+            libwayland-bin libwayland-dev wayland-protocols ccache
 
           echo "[+] Installing modern Google CIPD GN binary..."
           curl -fSL "https://chrome-infra-packages.appspot.com/dl/gn/gn/linux-amd64/+/latest" -o gn.zip
@@ -210,6 +210,15 @@ jobs:
           cp $(which gperf) third_party/gperf/cipd/bin/gperf
           ./third_party/gperf/cipd/bin/gperf --version
 
+      - name: Setup & Restore CCache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-${{ matrix.edition }}-${{ github.run_id }}
+          restore-keys: |
+            ccache-${{ matrix.edition }}-
+            ccache-
+
       - name: Configure GN Compilation Arguments
         run: |
           cd engine-src
@@ -229,11 +238,17 @@ jobs:
               "treat_warnings_as_errors = false" \
               "clang_use_chrome_plugins = false" \
               "chrome_pgo_phase = 0" \
+              "cc_wrapper = \"ccache\"" \
               "enable_nacl = false" \
               "enable_remoting = false" \
               "enable_reporting = false" \
               "enable_service_discovery = false" \
               "enable_vr = false" \
+              "build_with_tflite_lib = false" \
+              "enable_compose = false" \
+              "enable_glic = false" \
+              "enable_speech_service = false" \
+              "enable_print_preview = false" \
               "use_debug_fission = false" > out/Default/args.gn
           else
             cat ../core-whitelist/flags.gn > out/Default/args.gn
@@ -247,11 +262,17 @@ jobs:
               "use_lld = true" \
               "proprietary_codecs = true" \
               "ffmpeg_branding = \"Chrome\"" \
+              "cc_wrapper = \"ccache\"" \
               "enable_nacl = false" \
               "enable_remoting = false" \
               "enable_reporting = false" \
               "enable_service_discovery = false" \
               "enable_vr = false" \
+              "build_with_tflite_lib = false" \
+              "enable_compose = false" \
+              "enable_glic = false" \
+              "enable_speech_service = false" \
+              "enable_print_preview = false" \
               "use_debug_fission = false" >> out/Default/args.gn
           fi
           mkdir -p buildtools/linux64
@@ -262,6 +283,13 @@ jobs:
         if: ${{ !(inputs.dry_run) }}
         run: |
           cd engine-src
+
+          export CCACHE_DIR="$HOME/.cache/ccache"
+          export CCACHE_MAXSIZE="8G"
+          export CCACHE_COMPRESS="1"
+          export CCACHE_COMPRESSLEVEL="6"
+          echo "[+] Initial CCache Status:"
+          ccache -s
 
           echo "[+] Resolving generated header dependencies for Perfetto..."
           ninja -C out/Default third_party/perfetto/src/trace_processor/tables:tables || true
@@ -414,6 +442,9 @@ jobs:
 
           echo "[+] Starting main Chrome binary compilation..."
           ninja -C out/Default chrome
+
+          echo "[+] Final CCache Statistics:"
+          ccache -s
 
       - name: Run Post-Build Verification & Smoke Tests
         if: ${{ !(inputs.dry_run) }}
