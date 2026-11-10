@@ -226,16 +226,6 @@ jobs:
             buildcache-
             ccache-
 
-      - name: Touch Restored Ninja Artifacts
-        run: |
-          if [ -d "engine-src/out/Default/obj" ]; then
-            echo "[+] Updating mtime of restored Ninja objects..."
-            find engine-src/out/Default/obj -type f -exec touch {} + 2>/dev/null || true
-          fi
-          if [ -d "engine-src/out/Default/gen" ]; then
-            find engine-src/out/Default/gen -type f -exec touch {} + 2>/dev/null || true
-          fi
-
       - name: Configure GN Compilation Arguments
         run: |
           cd engine-src
@@ -449,6 +439,15 @@ jobs:
 
           if [ -f third_party/node/check_version.js ]; then
             echo "process.exit(0);" > third_party/node/check_version.js
+          fi
+
+          echo "[+] Synchronizing mtime: Touching gen headers then obj files strictly before Ninja build..."
+          if [ -d "out/Default/gen" ]; then
+            find out/Default/gen -type f -exec touch {} + 2>/dev/null || true
+          fi
+          sleep 1
+          if [ -d "out/Default/obj" ]; then
+            find out/Default/obj -type f -exec touch {} + 2>/dev/null || true
           fi
 
           echo "[+] Starting main Chrome binary compilation with soft timeout (310m)..."
