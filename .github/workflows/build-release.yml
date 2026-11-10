@@ -441,11 +441,16 @@ jobs:
             echo "process.exit(0);" > third_party/node/check_version.js
           fi
 
-          echo "[+] Synchronizing mtime: Touching gen headers then obj files strictly before Ninja build..."
+          echo "[+] Synchronizing mtime: 3-Stage Timestamp Hierarchy strictly before Ninja build..."
+          # Stage 1: Ensure build.ninja is newer than any input in build.ninja.d to prevent [0/1] Regenerating ninja files
+          touch out/Default/build.ninja out/Default/build.ninja.d 2>/dev/null || true
+          sleep 1
+          # Stage 2: Ensure gen headers are newer than build.ninja
           if [ -d "out/Default/gen" ]; then
             find out/Default/gen -type f -exec touch {} + 2>/dev/null || true
           fi
           sleep 1
+          # Stage 3: Ensure obj files are newer than gen headers, build.ninja, and all source code
           if [ -d "out/Default/obj" ]; then
             find out/Default/obj -type f -exec touch {} + 2>/dev/null || true
           fi
