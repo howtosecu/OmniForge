@@ -138,6 +138,8 @@ jobs:
           curl -fSL "$URL" -o engine.tar.xz
           tar -xf engine.tar.xz --strip-components=1 -C engine-src
           rm -f engine.tar.xz
+          echo "[+] Setting source tree to reproducible past epoch (2026-01-01)..."
+          find engine-src -type f -exec touch -d "2026-01-01 00:00:00" {} + 2>/dev/null || true
 
       - name: Apply Pruning & Domain Neutralization
         if: ${{ matrix.edition != 'phantom' }}
@@ -441,22 +443,17 @@ jobs:
             echo "process.exit(0);" > third_party/node/check_version.js
           fi
 
-          echo "[+] Synchronizing mtime: 3-Stage Timestamp Hierarchy strictly before Ninja build..."
-          # Stage 1: Ensure build.ninja is newer than any input in build.ninja.d to prevent [0/1] Regenerating ninja files
-          touch out/Default/build.ninja out/Default/build.ninja.d 2>/dev/null || true
-          sleep 1
-          # Stage 2: Ensure gen headers are newer than build.ninja
+          echo "[+] Ensuring restored object files are strictly newer than all inputs..."
           if [ -d "out/Default/gen" ]; then
             find out/Default/gen -type f -exec touch {} + 2>/dev/null || true
           fi
           sleep 1
-          # Stage 3: Ensure obj files are newer than gen headers, build.ninja, and all source code
           if [ -d "out/Default/obj" ]; then
             find out/Default/obj -type f -exec touch {} + 2>/dev/null || true
           fi
 
           echo "[+] Starting main Chrome binary compilation with soft timeout (310m)..."
-          timeout 310m ninja -C out/Default chrome || true
+          timeout 310m ninja -d explain -C out/Default chrome || true
 
           echo "[+] Final CCache Statistics:"
           ccache -s
