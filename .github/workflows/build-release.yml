@@ -212,6 +212,9 @@ jobs:
           cp $(which gperf) third_party/gperf/cipd/bin/gperf
           ./third_party/gperf/cipd/bin/gperf --version
 
+          echo "[+] Clamping installed toolchains and binaries to reproducible past epoch..."
+          find third_party tools build/linux -type f -exec touch -d "2026-01-01 00:00:00" {} + 2>/dev/null || true
+
       - name: Setup & Restore Build Cache (CCache & Ninja Targets)
         uses: actions/cache@v4
         with:
@@ -449,7 +452,7 @@ jobs:
           fi
           sleep 1
           if [ -d "out/Default/obj" ]; then
-            find out/Default/obj -type f -exec touch {} + 2>/dev/null || true
+            find out/Default/obj -name "*.o" -exec touch {} + 2>/dev/null || true
           fi
 
           echo "[+] Starting main Chrome binary compilation with soft timeout (310m)..."
