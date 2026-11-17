@@ -109,8 +109,8 @@ jobs:
             libxss-dev libasound2-dev libpci-dev libxkbcommon-dev libgbm-dev \
             libwayland-bin libwayland-dev wayland-protocols ccache
 
-          echo "[+] Installing modern Google CIPD GN binary..."
-          curl -fSL "https://chrome-infra-packages.appspot.com/dl/gn/gn/linux-amd64/+/latest" -o gn.zip
+          echo "[+] Installing modern Google CIPD GN binary (pinned revision ddc6c4ae)..."
+          curl -fSL "https://chrome-infra-packages.appspot.com/dl/gn/gn/linux-amd64/+/git_revision:ddc6c4ae595393d43b38e62f2e2baa7661af716f" -o gn.zip
           sudo unzip -o gn.zip gn -d /usr/local/bin/
           sudo chmod +x /usr/local/bin/gn
           rm -f gn.zip
