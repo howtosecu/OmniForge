@@ -457,6 +457,9 @@ jobs:
             find out/Default/obj -type f ! -name "*.txt" -exec touch {} + 2>/dev/null || true
           fi
 
+          echo "[+] Synchronizing Ninja build log with filesystem via restat..."
+          ninja -C out/Default -t restat || true
+
           echo "[+] Starting main Chrome binary compilation with soft timeout (310m)..."
           timeout 310m ninja -d explain -C out/Default chrome || true
 
