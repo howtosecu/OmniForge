@@ -252,6 +252,7 @@ jobs:
               "chrome_pgo_phase = 0" \
               "cc_wrapper = \"ccache\"" \
               "use_libcxx_modules = false" \
+              "use_clang_modules = false" \
               "enable_nacl = false" \
               "enable_remoting = false" \
               "enable_reporting = false" \
@@ -272,6 +273,7 @@ jobs:
               "ffmpeg_branding = \"Chrome\"" \
               "cc_wrapper = \"ccache\"" \
               "use_libcxx_modules = false" \
+              "use_clang_modules = false" \
               "enable_nacl = false" \
               "enable_remoting = false" \
               "enable_reporting = false" \
@@ -445,6 +447,9 @@ jobs:
           if [ -f third_party/node/check_version.js ]; then
             echo "process.exit(0);" > third_party/node/check_version.js
           fi
+
+          echo "[+] Purging stale ninja deps database to eliminate out-of-date dependency warnings..."
+          rm -f out/Default/.ninja_deps
 
           echo "[+] Ensuring restored object files are strictly newer than all inputs..."
           if [ -d "out/Default/gen" ]; then
