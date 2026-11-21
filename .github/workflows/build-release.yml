@@ -484,12 +484,18 @@ jobs:
 
           if [ "${{ matrix.edition }}" = "agentic" ] || [ "${{ matrix.edition }}" = "phantom" ]; then
             echo "[Gate 4: Stealth Evasion Invariant Gate]"
-            ./chrome --headless=new --no-sandbox --disable-gpu \
-              --fingerprint-platform="win" \
-              --fingerprint-hardware-concurrency=16 \
-              --dump-dom "about:blank" > /dev/null
-            echo "[✔] Stealth evasion runtime flags accepted."
+            VERIFY_SCRIPT="${GITHUB_WORKSPACE:-../../..}/scripts/verify_stealth.py"
+            [ ! -f "$VERIFY_SCRIPT" ] && VERIFY_SCRIPT="../../scripts/verify_stealth.py"
+            python3 "$VERIFY_SCRIPT" ./chrome
+            echo "[✔] Stealth evasion invariants verified."
           fi
+
+          echo "[Gate 5: CDP Automation Remote Debugging Gate]"
+          ./chrome --headless=new --no-sandbox --disable-gpu --remote-debugging-port=9222 "about:blank" &
+          CHROME_PID=$!
+          sleep 3
+          curl -s http://127.0.0.1:9222/json/version | grep "webSocketDebuggerUrl" && echo "[✔] CDP WebSocket Debugger operational." || { kill -9 $CHROME_PID 2>/dev/null || true; exit 1; }
+          kill -9 $CHROME_PID 2>/dev/null || true
 
       - name: Package Linux Binary Artifact
         if: ${{ !(inputs.dry_run) && hashFiles('engine-src/out/Default/chrome') != '' }}
