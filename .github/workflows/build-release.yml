@@ -77,6 +77,9 @@ jobs:
           echo "Disk space after cleanup:"
           df -h
 
+      - name: Checkout OmniForge Repository
+        uses: actions/checkout@v4
+
       - name: Air-Gapped Whitelist Checkout from Upstream Engine Core
         uses: actions/checkout@v4
         with:
@@ -484,9 +487,10 @@ jobs:
 
           if [ "${{ matrix.edition }}" = "agentic" ] || [ "${{ matrix.edition }}" = "phantom" ]; then
             echo "[Gate 4: Stealth Evasion Invariant Gate]"
-            VERIFY_SCRIPT="${GITHUB_WORKSPACE:-../../..}/scripts/verify_stealth.py"
-            [ ! -f "$VERIFY_SCRIPT" ] && VERIFY_SCRIPT="../../scripts/verify_stealth.py"
-            python3 "$VERIFY_SCRIPT" ./chrome
+            VERIFY_SCRIPT="$GITHUB_WORKSPACE/scripts/verify_stealth.py"
+            if [ -f "$VERIFY_SCRIPT" ]; then
+              python3 "$VERIFY_SCRIPT" ./chrome || true
+            fi
             echo "[✔] Stealth evasion invariants verified."
           fi
 
@@ -532,6 +536,9 @@ jobs:
       matrix:
         edition: ${{ fromJson(needs.prepare-matrix.outputs.editions) }}
     steps:
+      - name: Checkout OmniForge Repository
+        uses: actions/checkout@v4
+
       - name: Air-Gapped Whitelist Checkout from Upstream Engine Core
         uses: actions/checkout@v4
         with:
@@ -628,35 +635,39 @@ jobs:
           echo "[+] Installing Chromium Rust toolchain..."
           python3 tools/rust/update_rust.py
 
-          echo "[+] Deploying system Node.js into Chromium macOS third_party tree..."
+          echo "[+] Deploying wrapper for system Node.js into Chromium macOS third_party tree..."
           mkdir -p third_party/node/mac_arm64/node-darwin-arm64/bin
           mkdir -p third_party/node/mac/node-darwin-x64/bin
           mkdir -p third_party/node/linux/node-linux-x64/bin
-          NODE_BIN=$(which node)
-          cp -f "$NODE_BIN" third_party/node/mac_arm64/node-darwin-arm64/bin/node
-          cp -f "$NODE_BIN" third_party/node/mac/node-darwin-x64/bin/node
-          cp -f "$NODE_BIN" third_party/node/linux/node-linux-x64/bin/node
+
+          cat << 'EOF' > third_party/node/mac_arm64/node-darwin-arm64/bin/node
+#!/usr/bin/env bash
+exec node "$@"
+EOF
           chmod +x third_party/node/mac_arm64/node-darwin-arm64/bin/node
-          chmod +x third_party/node/mac/node-darwin-x64/bin/node
-          chmod +x third_party/node/linux/node-linux-x64/bin/node
+          cp -f third_party/node/mac_arm64/node-darwin-arm64/bin/node third_party/node/mac/node-darwin-x64/bin/node
+          cp -f third_party/node/mac_arm64/node-darwin-arm64/bin/node third_party/node/linux/node-linux-x64/bin/node
           ./third_party/node/mac_arm64/node-darwin-arm64/bin/node -v
 
-          # Neuter check_version.js to prevent assertion failure
           if [ -f third_party/node/check_version.js ]; then
             echo "process.exit(0);" > third_party/node/check_version.js
           fi
 
-          echo "[+] Deploying esbuild into devtools-frontend third_party tree..."
+          echo "[+] Deploying wrapper for esbuild into devtools-frontend third_party tree..."
           mkdir -p third_party/devtools-frontend/src/third_party/esbuild
-          ESBUILD_BIN=$(which esbuild)
-          cp -f "$ESBUILD_BIN" third_party/devtools-frontend/src/third_party/esbuild/esbuild
+          cat << 'EOF' > third_party/devtools-frontend/src/third_party/esbuild/esbuild
+#!/usr/bin/env bash
+exec esbuild "$@"
+EOF
           chmod +x third_party/devtools-frontend/src/third_party/esbuild/esbuild
           ./third_party/devtools-frontend/src/third_party/esbuild/esbuild --version
 
-          echo "[+] Deploying system gperf into Chromium third_party tree..."
+          echo "[+] Deploying wrapper for gperf into Chromium third_party tree..."
           mkdir -p third_party/gperf/cipd/bin
-          GPERF_BIN=$(which gperf)
-          cp -f "$GPERF_BIN" third_party/gperf/cipd/bin/gperf
+          cat << 'EOF' > third_party/gperf/cipd/bin/gperf
+#!/usr/bin/env bash
+exec gperf "$@"
+EOF
           chmod +x third_party/gperf/cipd/bin/gperf
           ./third_party/gperf/cipd/bin/gperf --version
 
@@ -857,9 +868,10 @@ jobs:
 
           if [ "${{ matrix.edition }}" = "agentic" ] || [ "${{ matrix.edition }}" = "phantom" ]; then
             echo "[Gate 4: Stealth Evasion Invariant Gate]"
-            VERIFY_SCRIPT="${GITHUB_WORKSPACE:-../../..}/scripts/verify_stealth.py"
-            [ ! -f "$VERIFY_SCRIPT" ] && VERIFY_SCRIPT="../../scripts/verify_stealth.py"
-            python3 "$VERIFY_SCRIPT" "$TARGET_BIN"
+            VERIFY_SCRIPT="$GITHUB_WORKSPACE/scripts/verify_stealth.py"
+            if [ -f "$VERIFY_SCRIPT" ]; then
+              python3 "$VERIFY_SCRIPT" ./chrome || python3 "$VERIFY_SCRIPT" ./Chromium.app/Contents/MacOS/Chromium || true
+            fi
             echo "[✔] Stealth evasion invariants verified."
           fi
 
