@@ -666,11 +666,30 @@ jobs:
           mkdir -p ui/gl/resources/angle-metal
           touch ui/gl/resources/angle-metal/gpu_shader_cache.bin
 
+          echo "[+] Patching missing macOS 15 SDK CoreGraphics constants (kCGImageByteOrder32Host)..."
+          if [ -f "$GITHUB_WORKSPACE/scripts/patch_mac_sdk.py" ]; then
+            python3 "$GITHUB_WORKSPACE/scripts/patch_mac_sdk.py" .
+          else
+            python3 -c "import textwrap; exec(textwrap.dedent('''
+              import os, glob
+              files_to_check = ['skia/ext/skia_utils_mac.mm'] + glob.glob('skia/ext/*.mm') + glob.glob('skia/ext/*.h')
+              fallback_code = '''#ifndef kCGImageByteOrder32Host\n#if defined(__BIG_ENDIAN__) && __BIG_ENDIAN__\n#define kCGImageByteOrder32Host kCGImageByteOrder32Big\n#else\n#define kCGImageByteOrder32Host kCGImageByteOrder32Little\n#endif\n#endif\n'''
+              for p in files_to_check:
+                  if os.path.exists(p):
+                      with open(p, 'r', encoding='utf-8', errors='ignore') as f:
+                          c = f.read()
+                      if 'kCGImageByteOrder32Host' in c and '#define kCGImageByteOrder32Host' not in c:
+                          with open(p, 'w', encoding='utf-8') as f:
+                              f.write(fallback_code + c)
+                          print(f'[+] Successfully patched {p} with kCGImageByteOrder32Host fallback.')
+            '''))"
+          fi
+
           echo "[+] Clamping installed toolchains and binaries to reproducible past epoch..."
           if command -v gtouch &>/dev/null; then
-            find third_party tools ui/gl/resources -type f -exec gtouch -d "2026-01-01 00:00:00" {} + 2>/dev/null || true
+            find third_party tools ui/gl/resources skia/ext -type f -exec gtouch -d "2026-01-01 00:00:00" {} + 2>/dev/null || true
           else
-            find third_party tools ui/gl/resources -type f -exec touch -t 202601010000.00 {} + 2>/dev/null || true
+            find third_party tools ui/gl/resources skia/ext -type f -exec touch -t 202601010000.00 {} + 2>/dev/null || true
           fi
 
       - name: Setup & Restore Build Cache (CCache & Ninja Targets)
