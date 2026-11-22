@@ -526,7 +526,7 @@ jobs:
   build-macos-arm64:
     name: Build macOS ARM64 (${{ matrix.edition }})
     needs: prepare-matrix
-    runs-on: macos-14
+    runs-on: macos-15
     strategy:
       fail-fast: false
       matrix:
