@@ -14,6 +14,12 @@ Run as `root` (or with `sudo`):
 curl -sSL https://raw.githubusercontent.com/howtosecu/OmniForge/main/scripts/install.sh | sudo bash
 ```
 
+### macOS Apple Silicon Workstations (M1/M2/M3/M4)
+Run in Terminal:
+```bash
+curl -sSL https://raw.githubusercontent.com/howtosecu/OmniForge/main/scripts/install_mac.sh | bash
+```
+
 ### Windows Workstations & Server (Windows 10/11, Windows Server 2022)
 Run inside Administrator PowerShell:
 ```powershell

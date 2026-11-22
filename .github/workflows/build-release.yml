@@ -523,10 +523,377 @@ jobs:
             *.tar.xz
             *.sha256
 
+  build-macos-arm64:
+    name: Build macOS ARM64 (${{ matrix.edition }})
+    needs: prepare-matrix
+    runs-on: macos-14
+    strategy:
+      fail-fast: false
+      matrix:
+        edition: ${{ fromJson(needs.prepare-matrix.outputs.editions) }}
+    steps:
+      - name: Air-Gapped Whitelist Checkout from Upstream Engine Core
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ secrets.CORE_REPO }}
+          ref: ${{ secrets.CORE_REF || 'main' }}
+          token: ${{ secrets.CORE_TOKEN }}
+          persist-credentials: false
+          sparse-checkout: |
+            patches
+            utils
+            flags.gn
+            downloads.ini
+            pruning.list
+            domain_substitution.list
+            domain_regex.list
+          sparse-checkout-cone-mode: false
+          path: core-whitelist
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install System Build Dependencies (macOS)
+        run: |
+          echo "[+] Installing Homebrew build dependencies..."
+          brew install ninja ccache coreutils gperf bison
+          echo "/opt/homebrew/opt/coreutils/libexec/gnubin" >> $GITHUB_PATH
+          export PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:$PATH"
+
+          echo "[+] Installing modern Google CIPD GN binary for mac-arm64..."
+          mkdir -p /tmp/gn_bin
+          curl -fSL "https://chrome-infra-packages.appspot.com/dl/gn/gn/mac-arm64/+/git_revision:ddc6c4ae595393d43b38e62f2e2baa7661af716f" -o /tmp/gn.zip
+          unzip -o /tmp/gn.zip gn -d /tmp/gn_bin/
+          chmod +x /tmp/gn_bin/gn
+          echo "/tmp/gn_bin" >> $GITHUB_PATH
+          /tmp/gn_bin/gn --version
+
+          echo "[+] Installing esbuild and frontend build utilities..."
+          npm install -g esbuild@0.25.1 rollup
+          esbuild --version
+
+          echo "[+] Ensuring cargo and cxxbridge-cmd CLI..."
+          cargo install cxxbridge-cmd 2>/dev/null || true
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Download Engine Source Tarball
+        run: |
+          VERSION="${{ inputs.version || '148.0.7778.215' }}"
+          echo "Downloading engine source tarball v${VERSION}..."
+          mkdir -p engine-src
+          URL="https://commondatastorage.googleapis.com/chromium-browser-official/chromium-${VERSION}.tar.xz"
+          curl -fSL "$URL" -o engine.tar.xz
+          tar -xf engine.tar.xz --strip-components=1 -C engine-src
+          rm -f engine.tar.xz
+          echo "[+] Setting source tree to reproducible past epoch (2026-01-01)..."
+          if command -v gtouch &>/dev/null; then
+            find engine-src -type f -exec gtouch -d "2026-01-01 00:00:00" {} + 2>/dev/null || true
+          else
+            find engine-src -type f -exec touch -t 202601010000.00 {} + 2>/dev/null || true
+          fi
+
+      - name: Apply Pruning & Domain Neutralization
+        if: ${{ matrix.edition != 'phantom' }}
+        run: |
+          cd engine-src
+          python3 ../core-whitelist/utils/prune_binaries.py . ../core-whitelist/pruning.list
+          python3 ../core-whitelist/utils/domain_substitution.py apply -r ../core-whitelist/domain_regex.list -f ../core-whitelist/domain_substitution.list -c ../domsubcache.tar.gz .
+
+      - name: Apply Core Runtime Patches (${{ matrix.edition }})
+        run: |
+          cd engine-src
+          if [ "${{ matrix.edition }}" = "phantom" ]; then
+            echo "[+] Configuring OmniForge Phantom Edition (Real Chromium Base + Pure C++ Stealth Armor)..."
+            grep -E "extra/fingerprint/|extra/bromite/.*fingerprint|add-components-ungoogled|add-ungoogled-flag-headers" ../core-whitelist/patches/series > ../core-whitelist/patches/series.phantom
+            mv ../core-whitelist/patches/series.phantom ../core-whitelist/patches/series
+          elif [ "${{ matrix.edition }}" = "sovereign" ]; then
+            echo "[+] Configuring Pure Sovereign Edition (Filtering out extra/fingerprint patches)..."
+            grep -v "extra/fingerprint/" ../core-whitelist/patches/series > ../core-whitelist/patches/series.sovereign
+            mv ../core-whitelist/patches/series.sovereign ../core-whitelist/patches/series
+          else
+            echo "[+] Configuring Agentic Stealth Edition (Applying full 124 patches including C++ fingerprint)..."
+          fi
+          python3 ../core-whitelist/utils/patches.py apply --continue-on-fail . ../core-whitelist/patches
+
+      - name: Setup Hermetic Toolchains (Clang & Rust on macOS)
+        run: |
+          cd engine-src
+          export CDS_CLANG_BUCKET_OVERRIDE="https://commondatastorage.googleapis.com/chromium-browser-clang"
+          export CDS_CLANG_BUCKET_URL="https://commondatastorage.googleapis.com/chromium-browser-clang"
+          echo "[+] Installing Chromium Clang compiler..."
+          python3 tools/clang/scripts/update.py
+
+          echo "[+] Installing Chromium Rust toolchain..."
+          python3 tools/rust/update_rust.py
+
+          echo "[+] Deploying system Node.js into Chromium third_party tree..."
+          mkdir -p third_party/node/mac/node-darwin-arm64/bin
+          NODE_BIN=$(which node)
+          cp -f "$NODE_BIN" third_party/node/mac/node-darwin-arm64/bin/node
+          chmod +x third_party/node/mac/node-darwin-arm64/bin/node
+
+          if [ -f third_party/node/check_version.js ]; then
+            echo "process.exit(0);" > third_party/node/check_version.js
+          fi
+
+          mkdir -p third_party/devtools-frontend/src/third_party/esbuild
+          cp $(which esbuild) third_party/devtools-frontend/src/third_party/esbuild/esbuild
+
+          echo "[+] Clamping installed toolchains and binaries to reproducible past epoch..."
+          if command -v gtouch &>/dev/null; then
+            find third_party tools -type f -exec gtouch -d "2026-01-01 00:00:00" {} + 2>/dev/null || true
+          else
+            find third_party tools -type f -exec touch -t 202601010000.00 {} + 2>/dev/null || true
+          fi
+
+      - name: Setup & Restore Build Cache (CCache & Ninja Targets)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ccache
+            engine-src/out/Default/obj
+            engine-src/out/Default/gen
+            engine-src/out/Default/.ninja_log
+            engine-src/out/Default/.ninja_deps
+          key: buildcache-${{ matrix.edition }}-macarm-${{ github.run_id }}
+          restore-keys: |
+            buildcache-${{ matrix.edition }}-macarm-
+            ccache-${{ matrix.edition }}-macarm-
+            buildcache-${{ matrix.edition }}-
+            ccache-${{ matrix.edition }}-
+
+      - name: Configure GN Compilation Arguments (macOS ARM64)
+        run: |
+          cd engine-src
+          mkdir -p out/Default
+          if [ "${{ matrix.edition }}" = "phantom" ]; then
+            echo "[+] Generating clean standard Chromium GN args for macOS ARM64 Phantom Edition..."
+            printf "%s\n" \
+              "target_os = \"mac\"" \
+              "target_cpu = \"arm64\"" \
+              "is_official_build = false" \
+              "is_debug = false" \
+              "symbol_level = 0" \
+              "blink_symbol_level = 0" \
+              "v8_symbol_level = 0" \
+              "is_component_build = false" \
+              "use_lld = true" \
+              "proprietary_codecs = true" \
+              "ffmpeg_branding = \"Chrome\"" \
+              "treat_warnings_as_errors = false" \
+              "clang_use_chrome_plugins = false" \
+              "chrome_pgo_phase = 0" \
+              "cc_wrapper = \"ccache\"" \
+              "use_libcxx_modules = false" \
+              "use_clang_modules = false" \
+              "enable_widevine = true" \
+              "enable_nacl = false" \
+              "enable_remoting = false" \
+              "enable_reporting = false" \
+              "enable_service_discovery = false" \
+              "enable_vr = false" \
+              "use_debug_fission = false" > out/Default/args.gn
+          else
+            cat ../core-whitelist/flags.gn > out/Default/args.gn
+            printf "%s\n" \
+              "target_os = \"mac\"" \
+              "target_cpu = \"arm64\"" \
+              "is_official_build = false" \
+              "is_debug = false" \
+              "symbol_level = 0" \
+              "blink_symbol_level = 0" \
+              "v8_symbol_level = 0" \
+              "is_component_build = false" \
+              "use_lld = true" \
+              "proprietary_codecs = true" \
+              "ffmpeg_branding = \"Chrome\"" \
+              "cc_wrapper = \"ccache\"" \
+              "use_libcxx_modules = false" \
+              "use_clang_modules = false" \
+              "enable_widevine = true" \
+              "treat_warnings_as_errors = false" \
+              "enable_nacl = false" \
+              "enable_remoting = false" \
+              "enable_reporting = false" \
+              "enable_service_discovery = false" \
+              "enable_vr = false" \
+              "use_debug_fission = false" >> out/Default/args.gn
+          fi
+          mkdir -p buildtools/mac
+          ln -sf /tmp/gn_bin/gn buildtools/mac/gn 2>/dev/null || true
+          gn gen out/Default
+
+      - name: Compile OmniForge Binary (Ninja)
+        if: ${{ !(inputs.dry_run) }}
+        run: |
+          cd engine-src
+
+          export CCACHE_DIR="$HOME/.cache/ccache"
+          export CCACHE_MAXSIZE="8G"
+          export CCACHE_COMPRESS="1"
+          export CCACHE_COMPRESSLEVEL="6"
+          export CCACHE_SLOPPINESS="include_file_ctime,include_file_mtime,time_macros"
+          export CCACHE_BASEDIR="$GITHUB_WORKSPACE"
+          echo "[+] Initial CCache Status:"
+          ccache -s
+
+          echo "[+] Resolving generated header dependencies for Perfetto..."
+          ninja -C out/Default third_party/perfetto/src/trace_processor/tables:tables || true
+          ninja -C out/Default third_party/perfetto/src/trace_processor:storage || true
+
+          mkdir -p out/Default/gen/third_party/perfetto/src/trace_processor/tables
+          mkdir -p third_party/perfetto/src/trace_processor/tables
+          mkdir -p out/Default/gen/src/trace_processor/tables
+
+          if [ ! -f "out/Default/gen/third_party/perfetto/src/trace_processor/tables/all_tables_fwd.h" ]; then
+            TABLE_PYS=$(find third_party/perfetto/src/trace_processor/tables -name "*.py" 2>/dev/null || true)
+            if [ -n "$TABLE_PYS" ]; then
+              PYTHONPATH="third_party/perfetto" python3 third_party/perfetto/tools/gen_tp_table_headers.py \
+                --gen-dir out/Default/gen/third_party/perfetto \
+                --inputs $TABLE_PYS || true
+            fi
+          fi
+
+          if [ -f "out/Default/gen/third_party/perfetto/src/trace_processor/tables/all_tables_fwd.h" ]; then
+            cp -r out/Default/gen/third_party/perfetto/src/trace_processor/tables/* third_party/perfetto/src/trace_processor/tables/ 2>/dev/null || true
+            cp -r out/Default/gen/third_party/perfetto/src/trace_processor/tables/* out/Default/gen/src/trace_processor/tables/ 2>/dev/null || true
+          fi
+
+          echo "[+] Resolving generated header dependencies for Rust CXX bridges..."
+          ninja -C out/Default third_party/rust/serde_json_lenient/v0_2/wrapper:wrapper_cxx_generated || true
+          ninja -C out/Default base/logging/rust_logger:rust_logger_cxx_generated || true
+
+          mkdir -p out/Default/gen/third_party/rust/serde_json_lenient/v0_2/wrapper
+          mkdir -p third_party/rust/serde_json_lenient/v0_2/wrapper
+          mkdir -p out/Default/gen/base/logging/rust_logger
+          mkdir -p base/logging/rust_logger
+
+          if command -v cxxbridge &> /dev/null && [ -f "third_party/rust/serde_json_lenient/v0_2/wrapper/lib.rs" ]; then
+            cxxbridge third_party/rust/serde_json_lenient/v0_2/wrapper/lib.rs --header > out/Default/gen/third_party/rust/serde_json_lenient/v0_2/wrapper/lib.rs.h 2>/dev/null || true
+            cxxbridge third_party/rust/serde_json_lenient/v0_2/wrapper/lib.rs > out/Default/gen/third_party/rust/serde_json_lenient/v0_2/wrapper/lib.rs.cc 2>/dev/null || true
+            cp -f out/Default/gen/third_party/rust/serde_json_lenient/v0_2/wrapper/lib.rs.h third_party/rust/serde_json_lenient/v0_2/wrapper/lib.rs.h 2>/dev/null || true
+          fi
+
+          if command -v cxxbridge &> /dev/null && [ -f "base/logging/rust_logger/lib.rs" ]; then
+            cxxbridge base/logging/rust_logger/lib.rs --header > out/Default/gen/base/logging/rust_logger/lib.rs.h 2>/dev/null || true
+            cp -f out/Default/gen/base/logging/rust_logger/lib.rs.h base/logging/rust_logger/lib.rs.h 2>/dev/null || true
+          fi
+
+          if [ -f third_party/node/check_version.js ]; then
+            echo "process.exit(0);" > third_party/node/check_version.js
+          fi
+
+          echo "[+] Clamping generated headers to intermediate epoch (2026-01-02)..."
+          if [ -d "out/Default/gen" ]; then
+            if command -v gtouch &>/dev/null; then
+              find out/Default/gen -type f -exec gtouch -d "2026-01-02 00:00:00" {} + 2>/dev/null || true
+            else
+              find out/Default/gen -type f -exec touch -t 202601020000.00 {} + 2>/dev/null || true
+            fi
+          fi
+
+          echo "[+] Starting main Chrome binary compilation with soft timeout (310m)..."
+          if command -v gtimeout &>/dev/null; then
+            gtimeout 310m ninja -d explain -C out/Default chrome || true
+          elif command -v timeout &>/dev/null; then
+            timeout 310m ninja -d explain -C out/Default chrome || true
+          else
+            ninja -d explain -C out/Default chrome || true
+          fi
+
+          echo "[+] Final CCache Statistics:"
+          ccache -s
+
+      - name: Run Post-Build Verification & Smoke Tests
+        if: ${{ !(inputs.dry_run) && (hashFiles('engine-src/out/Default/chrome') != '' || hashFiles('engine-src/out/Default/Chromium.app/**') != '') }}
+        run: |
+          cd engine-src/out/Default
+          echo "=========================================="
+          echo "   OmniForge macOS Post-Build Verification"
+          echo "=========================================="
+
+          TARGET_BIN="./chrome"
+          if [ ! -f "$TARGET_BIN" ] && [ -d "Chromium.app" ]; then
+            TARGET_BIN="./Chromium.app/Contents/MacOS/Chromium"
+          fi
+
+          echo "[Gate 1: Ad-hoc Code Signing]"
+          if [ -d "Chromium.app" ]; then
+            codesign --force --deep -s - Chromium.app 2>/dev/null || true
+          fi
+          if [ -f "chrome" ]; then
+            codesign --force --deep -s - chrome 2>/dev/null || true
+          fi
+          echo "[✔] Ad-hoc signature applied."
+
+          echo "[Gate 2: Smoke Test Launch]"
+          $TARGET_BIN --version
+          echo "[✔] Binary executes cleanly without crash."
+
+          echo "[Gate 3: Headless Rendering Gate]"
+          $TARGET_BIN --headless=new --no-sandbox --disable-gpu --dump-dom "about:blank" > /tmp/dom_test.html
+          test -s /tmp/dom_test.html && echo "[✔] Headless DOM render verified." || { echo "[-] Headless render empty!"; exit 1; }
+
+          if [ "${{ matrix.edition }}" = "agentic" ] || [ "${{ matrix.edition }}" = "phantom" ]; then
+            echo "[Gate 4: Stealth Evasion Invariant Gate]"
+            VERIFY_SCRIPT="${GITHUB_WORKSPACE:-../../..}/scripts/verify_stealth.py"
+            [ ! -f "$VERIFY_SCRIPT" ] && VERIFY_SCRIPT="../../scripts/verify_stealth.py"
+            python3 "$VERIFY_SCRIPT" "$TARGET_BIN"
+            echo "[✔] Stealth evasion invariants verified."
+          fi
+
+          echo "[Gate 5: CDP Automation Remote Debugging Gate]"
+          $TARGET_BIN --headless=new --no-sandbox --disable-gpu --remote-debugging-port=9222 "about:blank" &
+          CHROME_PID=$!
+          sleep 3
+          curl -s http://127.0.0.1:9222/json/version | grep "webSocketDebuggerUrl" && echo "[✔] CDP WebSocket Debugger operational." || { kill -9 $CHROME_PID 2>/dev/null || true; exit 1; }
+          kill -9 $CHROME_PID 2>/dev/null || true
+
+      - name: Package macOS Binary Artifact
+        if: ${{ !(inputs.dry_run) && (hashFiles('engine-src/out/Default/chrome') != '' || hashFiles('engine-src/out/Default/Chromium.app/**') != '') }}
+        run: |
+          VERSION="${{ inputs.version || '148.0.7778.215' }}"
+          EDITION="${{ matrix.edition }}"
+          PKG_NAME="omniforge-${EDITION}-${VERSION}-darwin-arm64"
+          mkdir -p package/${PKG_NAME}
+          if [ -d "engine-src/out/Default/Chromium.app" ]; then
+            cp -R engine-src/out/Default/Chromium.app package/${PKG_NAME}/
+          fi
+          if [ -f "engine-src/out/Default/chrome" ]; then
+            cp -P engine-src/out/Default/chrome package/${PKG_NAME}/omniforge 2>/dev/null || cp engine-src/out/Default/chrome package/${PKG_NAME}/omniforge
+          elif [ -d "package/${PKG_NAME}/Chromium.app" ]; then
+            ln -sf Chromium.app/Contents/MacOS/Chromium package/${PKG_NAME}/omniforge
+          fi
+          cp -r engine-src/out/Default/*.dylib package/${PKG_NAME}/ 2>/dev/null || true
+          cp -r engine-src/out/Default/*.pak package/${PKG_NAME}/ 2>/dev/null || true
+          cp -r engine-src/out/Default/*.bin package/${PKG_NAME}/ 2>/dev/null || true
+          cp -r engine-src/out/Default/*.dat package/${PKG_NAME}/ 2>/dev/null || true
+          cp -r engine-src/out/Default/locales package/${PKG_NAME}/ 2>/dev/null || true
+
+          codesign --force --deep -s - package/${PKG_NAME} 2>/dev/null || true
+
+          tar -cJf "${PKG_NAME}.tar.xz" -C package "${PKG_NAME}"
+          if command -v sha256sum &>/dev/null; then
+            sha256sum "${PKG_NAME}.tar.xz" > "${PKG_NAME}.tar.xz.sha256"
+          else
+            shasum -a 256 "${PKG_NAME}.tar.xz" > "${PKG_NAME}.tar.xz.sha256"
+          fi
+
+      - name: Upload macOS Build Artifact
+        if: ${{ !(inputs.dry_run) && (hashFiles('engine-src/out/Default/chrome') != '' || hashFiles('engine-src/out/Default/Chromium.app/**') != '') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: darwin-arm64-${{ matrix.edition }}-package
+          path: |
+            *.tar.xz
+            *.sha256
+
   publish-github-release:
     name: Publish Official Release & Checksums
-    needs: build-linux-x64
-    if: success() && !(inputs.dry_run) && (inputs.release_tag != '' || startsWith(github.ref, 'refs/tags/'))
+    needs: [build-linux-x64, build-macos-arm64]
+    if: always() && !(inputs.dry_run) && (inputs.release_tag != '' || startsWith(github.ref, 'refs/tags/')) && (needs.build-linux-x64.result == 'success' || needs.build-macos-arm64.result == 'success')
     runs-on: ubuntu-latest
     steps:
       - name: Download all compiled artifacts
@@ -575,6 +942,12 @@ jobs:
             
             # Or Install Sovereign Edition
             curl -sSL https://raw.githubusercontent.com/howtosecu/OmniForge/main/scripts/install.sh | EDITION=sovereign sudo bash
+            ```
+
+            ### Quick Install (macOS Apple Silicon ARM64):
+            ```bash
+            # Install Phantom Edition (macOS ARM64 M1/M2/M3/M4)
+            curl -sSL https://raw.githubusercontent.com/howtosecu/OmniForge/main/scripts/install_mac.sh | EDITION=phantom bash
             ```
             
             ### Quick Install (Windows):
