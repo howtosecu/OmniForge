@@ -632,6 +632,40 @@ jobs:
           echo "[+] Installing Chromium Clang compiler..."
           python3 tools/clang/scripts/update.py
 
+          echo "[+] Deploying Mach-O link utilities (llvm-otool, llvm-install-name-tool, llvm-strip, llvm-nm)..."
+          LLVM_BIN="third_party/llvm-build/Release+Asserts/bin"
+          mkdir -p "$LLVM_BIN"
+
+          if [ ! -f "$LLVM_BIN/llvm-otool" ]; then
+            if command -v otool &>/dev/null; then
+              ln -sf $(which otool) "$LLVM_BIN/llvm-otool"
+            elif [ -f "$LLVM_BIN/llvm-objdump" ]; then
+              ln -sf llvm-objdump "$LLVM_BIN/llvm-otool"
+            fi
+          fi
+
+          if [ ! -f "$LLVM_BIN/llvm-install-name-tool" ]; then
+            if command -v install_name_tool &>/dev/null; then
+              ln -sf $(which install_name_tool) "$LLVM_BIN/llvm-install-name-tool"
+            elif [ -f "$LLVM_BIN/llvm-objcopy" ]; then
+              ln -sf llvm-objcopy "$LLVM_BIN/llvm-install-name-tool"
+            fi
+          fi
+
+          if [ ! -f "$LLVM_BIN/llvm-strip" ]; then
+            if command -v strip &>/dev/null; then
+              ln -sf $(which strip) "$LLVM_BIN/llvm-strip"
+            elif [ -f "$LLVM_BIN/llvm-objcopy" ]; then
+              ln -sf llvm-objcopy "$LLVM_BIN/llvm-strip"
+            fi
+          fi
+
+          if [ ! -f "$LLVM_BIN/llvm-nm" ]; then
+            if command -v nm &>/dev/null; then
+              ln -sf $(which nm) "$LLVM_BIN/llvm-nm"
+            fi
+          fi
+
           echo "[+] Installing Chromium Rust toolchain..."
           python3 tools/rust/update_rust.py
 
