@@ -719,11 +719,14 @@ jobs:
             '''))"
           fi
 
+          echo "[+] Patching missing NSScreen CGDirectDisplayID for macOS 15 SDK in ui/display/mac..."
+          python3 -c "import os, glob; [open(p, 'w').write(open(p).read().replace('screen.CGDirectDisplayID', '(((NSNumber*)[[screen deviceDescription] objectForKey:@\"NSScreenNumber\"]).unsignedIntValue)')) for p in glob.glob('ui/display/mac/*.mm') if os.path.exists(p) and 'screen.CGDirectDisplayID' in open(p).read()]" || true
+
           echo "[+] Clamping installed toolchains and binaries to reproducible past epoch..."
           if command -v gtouch &>/dev/null; then
-            find third_party tools ui/gl/resources skia/ext -type f -exec gtouch -d "2026-01-01 00:00:00" {} + 2>/dev/null || true
+            find third_party tools ui/gl/resources skia/ext ui/display/mac -type f -exec gtouch -d "2026-01-01 00:00:00" {} + 2>/dev/null || true
           else
-            find third_party tools ui/gl/resources skia/ext -type f -exec touch -t 202601010000.00 {} + 2>/dev/null || true
+            find third_party tools ui/gl/resources skia/ext ui/display/mac -type f -exec touch -t 202601010000.00 {} + 2>/dev/null || true
           fi
 
       - name: Setup & Restore Build Cache (CCache & Ninja Targets)
