@@ -578,7 +578,7 @@ jobs:
           /tmp/gn_bin/gn --version
 
           echo "[+] Installing esbuild and frontend build utilities..."
-          npm install -g esbuild@0.25.1 rollup
+          npm install -g esbuild@0.25.1 rollup @rollup/rollup-darwin-arm64
           esbuild --version
 
           echo "[+] Ensuring cargo and cxxbridge-cmd CLI..."
@@ -689,6 +689,17 @@ jobs:
           printf '%s\n' '#!/usr/bin/env bash' 'exec esbuild "$@"' > third_party/devtools-frontend/src/third_party/esbuild/esbuild
           chmod +x third_party/devtools-frontend/src/third_party/esbuild/esbuild
           ./third_party/devtools-frontend/src/third_party/esbuild/esbuild --version
+
+          echo "[+] Deploying native @rollup/rollup-darwin-arm64 into devtools-frontend tree..."
+          if [ -d "third_party/devtools-frontend/src" ]; then
+            mkdir -p "third_party/devtools-frontend/src/node_modules/@rollup"
+            GLOBAL_ROLLUP="$(npm root -g)/@rollup/rollup-darwin-arm64"
+            if [ -d "$GLOBAL_ROLLUP" ]; then
+              cp -rf "$GLOBAL_ROLLUP" "third_party/devtools-frontend/src/node_modules/@rollup/"
+            else
+              (cd third_party/devtools-frontend/src && npm install @rollup/rollup-darwin-arm64 --no-save) || true
+            fi
+          fi
 
           echo "[+] Deploying wrapper shim for gperf into Chromium third_party tree..."
           mkdir -p third_party/gperf/cipd/bin
