@@ -635,15 +635,12 @@ jobs:
           echo "[+] Installing Chromium Rust toolchain..."
           python3 tools/rust/update_rust.py
 
-          echo "[+] Deploying wrapper for system Node.js into Chromium macOS third_party tree..."
+          echo "[+] Deploying wrapper shims for system Node.js into Chromium macOS third_party tree..."
           mkdir -p third_party/node/mac_arm64/node-darwin-arm64/bin
           mkdir -p third_party/node/mac/node-darwin-x64/bin
           mkdir -p third_party/node/linux/node-linux-x64/bin
 
-          cat << 'EOF' > third_party/node/mac_arm64/node-darwin-arm64/bin/node
-#!/usr/bin/env bash
-exec node "$@"
-EOF
+          printf '%s\n' '#!/usr/bin/env bash' 'exec node "$@"' > third_party/node/mac_arm64/node-darwin-arm64/bin/node
           chmod +x third_party/node/mac_arm64/node-darwin-arm64/bin/node
           cp -f third_party/node/mac_arm64/node-darwin-arm64/bin/node third_party/node/mac/node-darwin-x64/bin/node
           cp -f third_party/node/mac_arm64/node-darwin-arm64/bin/node third_party/node/linux/node-linux-x64/bin/node
@@ -653,21 +650,15 @@ EOF
             echo "process.exit(0);" > third_party/node/check_version.js
           fi
 
-          echo "[+] Deploying wrapper for esbuild into devtools-frontend third_party tree..."
+          echo "[+] Deploying wrapper shim for esbuild into devtools-frontend third_party tree..."
           mkdir -p third_party/devtools-frontend/src/third_party/esbuild
-          cat << 'EOF' > third_party/devtools-frontend/src/third_party/esbuild/esbuild
-#!/usr/bin/env bash
-exec esbuild "$@"
-EOF
+          printf '%s\n' '#!/usr/bin/env bash' 'exec esbuild "$@"' > third_party/devtools-frontend/src/third_party/esbuild/esbuild
           chmod +x third_party/devtools-frontend/src/third_party/esbuild/esbuild
           ./third_party/devtools-frontend/src/third_party/esbuild/esbuild --version
 
-          echo "[+] Deploying wrapper for gperf into Chromium third_party tree..."
+          echo "[+] Deploying wrapper shim for gperf into Chromium third_party tree..."
           mkdir -p third_party/gperf/cipd/bin
-          cat << 'EOF' > third_party/gperf/cipd/bin/gperf
-#!/usr/bin/env bash
-exec gperf "$@"
-EOF
+          printf '%s\n' '#!/usr/bin/env bash' 'exec gperf "$@"' > third_party/gperf/cipd/bin/gperf
           chmod +x third_party/gperf/cipd/bin/gperf
           ./third_party/gperf/cipd/bin/gperf --version
 
