@@ -662,11 +662,15 @@ jobs:
           chmod +x third_party/gperf/cipd/bin/gperf
           ./third_party/gperf/cipd/bin/gperf --version
 
+          echo "[+] Ensuring macOS ANGLE Metal shader cache placeholder..."
+          mkdir -p ui/gl/resources/angle-metal
+          touch ui/gl/resources/angle-metal/gpu_shader_cache.bin
+
           echo "[+] Clamping installed toolchains and binaries to reproducible past epoch..."
           if command -v gtouch &>/dev/null; then
-            find third_party tools -type f -exec gtouch -d "2026-01-01 00:00:00" {} + 2>/dev/null || true
+            find third_party tools ui/gl/resources -type f -exec gtouch -d "2026-01-01 00:00:00" {} + 2>/dev/null || true
           else
-            find third_party tools -type f -exec touch -t 202601010000.00 {} + 2>/dev/null || true
+            find third_party tools ui/gl/resources -type f -exec touch -t 202601010000.00 {} + 2>/dev/null || true
           fi
 
       - name: Setup & Restore Build Cache (CCache & Ninja Targets)
