@@ -735,12 +735,10 @@ jobs:
             engine-src/out/Default/gen
             engine-src/out/Default/.ninja_log
             engine-src/out/Default/.ninja_deps
-          key: buildcache-${{ matrix.edition }}-macarm-${{ github.run_id }}
+          key: buildcache-v2-${{ matrix.edition }}-macarm-${{ github.run_id }}
           restore-keys: |
-            buildcache-${{ matrix.edition }}-macarm-
-            ccache-${{ matrix.edition }}-macarm-
-            buildcache-${{ matrix.edition }}-
-            ccache-${{ matrix.edition }}-
+            buildcache-v2-${{ matrix.edition }}-macarm-
+            ccache-v2-${{ matrix.edition }}-macarm-
 
       - name: Configure GN Compilation Arguments (macOS ARM64)
         run: |
