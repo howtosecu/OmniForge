@@ -880,6 +880,37 @@ jobs:
             echo "process.exit(0);" > third_party/node/check_version.js
           fi
 
+          echo "[+] Resolving generated header dependencies for WebRTC field trials..."
+          ninja -C out/Default third_party/webrtc/experiments:registered_field_trials || true
+
+          mkdir -p third_party/webrtc/experiments
+          mkdir -p out/Default/gen/third_party/webrtc/experiments
+          mkdir -p out/Default/gen/experiments
+
+          if [ -f third_party/webrtc/experiments/field_trials.py ]; then
+            python3 third_party/webrtc/experiments/field_trials.py header --output out/Default/gen/third_party/webrtc/experiments/registered_field_trials.h 2>/dev/null || true
+            python3 third_party/webrtc/experiments/field_trials.py header --output out/Default/gen/experiments/registered_field_trials.h 2>/dev/null || true
+            python3 third_party/webrtc/experiments/field_trials.py header --output third_party/webrtc/experiments/registered_field_trials.h 2>/dev/null || true
+          fi
+
+          # Fallback definition if header is still missing
+          if [ ! -f out/Default/gen/third_party/webrtc/experiments/registered_field_trials.h ] && [ ! -f third_party/webrtc/experiments/registered_field_trials.h ]; then
+            printf "%s\n" \
+              "#ifndef GEN_REGISTERED_FIELD_TRIALS_H_" \
+              "#define GEN_REGISTERED_FIELD_TRIALS_H_" \
+              "#include \"absl/strings/string_view.h\"" \
+              "namespace webrtc {" \
+              "inline constexpr absl::string_view kRegisteredFieldTrials[] = { \"\" };" \
+              "} // namespace webrtc" \
+              "#endif // GEN_REGISTERED_FIELD_TRIALS_H_" > third_party/webrtc/experiments/registered_field_trials.h
+            cp -f third_party/webrtc/experiments/registered_field_trials.h out/Default/gen/third_party/webrtc/experiments/registered_field_trials.h 2>/dev/null || true
+            cp -f third_party/webrtc/experiments/registered_field_trials.h out/Default/gen/experiments/registered_field_trials.h 2>/dev/null || true
+          fi
+
+          # Sync any generated files from out/Default/gen to search paths
+          find out/Default/gen -name "registered_field_trials.h" -exec cp -f {} third_party/webrtc/experiments/ \; 2>/dev/null || true
+          find out/Default/gen -name "registered_field_trials.h" -exec cp -f {} out/Default/gen/experiments/ \; 2>/dev/null || true
+
           echo "[+] Clamping generated headers to intermediate epoch (2026-01-02)..."
           if [ -d "out/Default/gen" ]; then
             if command -v gtouch &>/dev/null; then
