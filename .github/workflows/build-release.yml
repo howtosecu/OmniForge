@@ -706,7 +706,7 @@ jobs:
           else
             python3 -c "import textwrap; exec(textwrap.dedent('''
               import os, glob
-              files_to_check = ['skia/ext/skia_utils_mac.mm'] + glob.glob('skia/ext/*.mm') + glob.glob('skia/ext/*.h')
+              files_to_check = ['skia/ext/skia_utils_mac.mm'] + glob.glob('skia/ext/*.mm') + glob.glob('skia/ext/*.h') + glob.glob('third_party/blink/renderer/platform/mac/*.mm') + glob.glob('third_party/blink/renderer/platform/mac/*.h')
               fallback_code = '''#ifndef kCGImageByteOrder32Host\n#if defined(__BIG_ENDIAN__) && __BIG_ENDIAN__\n#define kCGImageByteOrder32Host kCGImageByteOrder32Big\n#else\n#define kCGImageByteOrder32Host kCGImageByteOrder32Little\n#endif\n#endif\n'''
               for p in files_to_check:
                   if os.path.exists(p):
@@ -719,14 +719,17 @@ jobs:
             '''))"
           fi
 
+          echo "[+] Ensuring Blink platform graphics_context_canvas.mm kCGImageByteOrder32Host patch..."
+          python3 -c "import os, glob; [open(p, 'w').write('''#ifndef kCGImageByteOrder32Host\n#if defined(__BIG_ENDIAN__) && __BIG_ENDIAN__\n#define kCGImageByteOrder32Host kCGImageByteOrder32Big\n#else\n#define kCGImageByteOrder32Host kCGImageByteOrder32Little\n#endif\n#endif\n''' + open(p).read()) for p in glob.glob('third_party/blink/renderer/platform/mac/*.mm') if os.path.exists(p) and 'kCGImageByteOrder32Host' in open(p).read() and '#define kCGImageByteOrder32Host' not in open(p).read()]" || true
+
           echo "[+] Patching missing NSScreen CGDirectDisplayID for macOS 15 SDK in ui/display/mac..."
           python3 -c "import os, glob; [open(p, 'w').write(open(p).read().replace('screen.CGDirectDisplayID', '(((NSNumber*)[[screen deviceDescription] objectForKey:@\"NSScreenNumber\"]).unsignedIntValue)')) for p in glob.glob('ui/display/mac/*.mm') if os.path.exists(p) and 'screen.CGDirectDisplayID' in open(p).read()]" || true
 
           echo "[+] Clamping installed toolchains and binaries to reproducible past epoch..."
           if command -v gtouch &>/dev/null; then
-            find third_party tools ui/gl/resources skia/ext ui/display/mac -type f -exec gtouch -d "2026-01-01 00:00:00" {} + 2>/dev/null || true
+            find third_party tools ui/gl/resources skia/ext ui/display/mac third_party/blink/renderer/platform/mac -type f -exec gtouch -d "2026-01-01 00:00:00" {} + 2>/dev/null || true
           else
-            find third_party tools ui/gl/resources skia/ext ui/display/mac -type f -exec touch -t 202601010000.00 {} + 2>/dev/null || true
+            find third_party tools ui/gl/resources skia/ext ui/display/mac third_party/blink/renderer/platform/mac -type f -exec touch -t 202601010000.00 {} + 2>/dev/null || true
           fi
 
       - name: Setup & Restore Build Cache (CCache & Ninja Targets)
