@@ -18,6 +18,7 @@ FALLBACK_CODE = """#ifndef kCGImageByteOrder32Host
 
 NSSCREEN_CATEGORY = """
 #if defined(__OBJC__)
+#import <AppKit/AppKit.h>
 @interface NSScreen (OmniForgeDisplayID)
 @property(readonly) CGDirectDisplayID CGDirectDisplayID;
 @end
@@ -76,8 +77,9 @@ def patch_display(root: str) -> int:
     for display_mac in display_dirs:
         if not os.path.exists(display_mac):
             continue
-        files_to_check = glob.glob(os.path.join(display_mac, "*.mm")) + \
-                         glob.glob(os.path.join(display_mac, "*.h"))
+        # Restrict strictly to Objective-C++ implementation files (.mm)
+        # NEVER append category implementation to header files (.h)
+        files_to_check = glob.glob(os.path.join(display_mac, "*.mm"))
         for p in files_to_check:
             if os.path.exists(p):
                 with open(p, "r", encoding="utf-8", errors="ignore") as f:
