@@ -227,12 +227,10 @@ jobs:
             engine-src/out/Default/gen
             engine-src/out/Default/.ninja_log
             engine-src/out/Default/.ninja_deps
-          key: buildcache-${{ matrix.edition }}-${{ github.run_id }}
+          key: buildcache-v2-${{ matrix.edition }}-linux-x64-${{ github.run_id }}
           restore-keys: |
-            buildcache-${{ matrix.edition }}-
-            ccache-${{ matrix.edition }}-
-            buildcache-
-            ccache-
+            buildcache-v2-${{ matrix.edition }}-linux-x64-
+            ccache-v2-${{ matrix.edition }}-linux-x64-
 
       - name: Configure GN Compilation Arguments
         run: |
