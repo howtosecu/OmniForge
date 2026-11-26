@@ -236,7 +236,7 @@ jobs:
         run: |
           cd engine-src
           mkdir -p out/Default
-          if [ "${{ matrix.edition }}" = "phantom" ] || [ "${{ matrix.edition }}" = "agentic" ]; then
+          if [ "${{ matrix.edition }}" = "phantom" ]; then
             echo "[+] Generating clean standard Chromium GN args for Phantom Edition..."
             printf "%s\n" \
               "is_official_build = false" \
@@ -723,6 +723,9 @@ jobs:
           echo "[+] Patching missing NSScreen CGDirectDisplayID for macOS 15 SDK in ui/display/mac..."
           python3 -c "import os, glob; [open(p, 'w').write(open(p).read().replace('screen.CGDirectDisplayID', '(((NSNumber*)[[screen deviceDescription] objectForKey:@\"NSScreenNumber\"]).unsignedIntValue)')) for p in glob.glob('ui/display/mac/*.mm') if os.path.exists(p) and 'screen.CGDirectDisplayID' in open(p).read()]" || true
 
+          echo "[+] Sanitizing macOS test dependencies for safe_browsing_mode=0..."
+          python3 -c "import os; p='chrome/test/BUILD.gn'; os.path.exists(p) and open(p, 'w').write('\n'.join([line for line in open(p).read().splitlines() if 'disk_image_type_sniffer_mac' not in line and 'archive_analyzer_results' not in line]))" || true
+
           echo "[+] Clamping installed toolchains and binaries to reproducible past epoch..."
           if command -v gtouch &>/dev/null; then
             find third_party tools ui/gl/resources skia/ext ui/display/mac third_party/blink/renderer/platform/mac -type f -exec gtouch -d "2026-01-01 00:00:00" {} + 2>/dev/null || true
@@ -748,7 +751,7 @@ jobs:
         run: |
           cd engine-src
           mkdir -p out/Default
-          if [ "${{ matrix.edition }}" = "phantom" ] || [ "${{ matrix.edition }}" = "agentic" ]; then
+          if [ "${{ matrix.edition }}" = "phantom" ]; then
             echo "[+] Generating clean standard Chromium GN args for macOS ARM64 Phantom Edition..."
             printf "%s\n" \
               "target_os = \"mac\"" \
