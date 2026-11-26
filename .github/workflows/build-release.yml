@@ -236,7 +236,7 @@ jobs:
         run: |
           cd engine-src
           mkdir -p out/Default
-          if [ "${{ matrix.edition }}" = "phantom" ]; then
+          if [ "${{ matrix.edition }}" = "phantom" ] || [ "${{ matrix.edition }}" = "agentic" ]; then
             echo "[+] Generating clean standard Chromium GN args for Phantom Edition..."
             printf "%s\n" \
               "is_official_build = false" \
@@ -748,7 +748,7 @@ jobs:
         run: |
           cd engine-src
           mkdir -p out/Default
-          if [ "${{ matrix.edition }}" = "phantom" ]; then
+          if [ "${{ matrix.edition }}" = "phantom" ] || [ "${{ matrix.edition }}" = "agentic" ]; then
             echo "[+] Generating clean standard Chromium GN args for macOS ARM64 Phantom Edition..."
             printf "%s\n" \
               "target_os = \"mac\"" \
