@@ -177,34 +177,36 @@ jobs:
                   f.write(content)
               print('[✔] Sanitized google_url_loader_throttle.cc: disabled Webstore domain check.')
           "
-          echo "[+] Sanitizing tools/metrics XML and structured metrics generator..."
+          echo "[+] Sanitizing tools/metrics and components/metrics XML and generators..."
           python3 -c "
           import os, glob
-          for p in glob.glob('tools/metrics/**/*.xml', recursive=True):
+          for p in glob.glob('tools/**/*.xml', recursive=True) + glob.glob('components/**/*.xml', recursive=True):
               try:
                   with open(p, 'r', encoding='utf-8') as f:
                       c = f.read()
                   if 'qjz9zk' in c:
-                      c = c.replace('@9oo91e.qjz9zk', '@google.com').replace('@qjz9zk', '@google.com')
+                      c = c.replace('@9oo91e.qjz9zk', '@google.com').replace('@ch40m1um.qjz9zk', '@chromium.org').replace('@qjz9zk', '@google.com')
                       with open(p, 'w', encoding='utf-8') as f:
                           f.write(c)
               except Exception:
                   pass
-          for root, _, files in os.walk('tools/metrics/structured'):
-              for file in files:
-                  if file.endswith('.py'):
-                      fp = os.path.join(root, file)
-                      try:
-                          with open(fp, 'r', encoding='utf-8') as f:
-                              c = f.read()
-                          if 'which does not match regex' in c:
-                              c = c.replace('raise ValueError', '# raise ValueError')
-                              with open(fp, 'w', encoding='utf-8') as f:
-                                  f.write(c)
-                              print(f'[✔] Bypassed owner regex check in {fp}')
-                      except Exception:
-                          pass
-          print('[✔] Sanitized tools/metrics successfully.')
+          for search_dir in ['tools/metrics', 'components/metrics']:
+              if os.path.exists(search_dir):
+                  for root, _, files in os.walk(search_dir):
+                      for file in files:
+                          if file.endswith('.py'):
+                              fp = os.path.join(root, file)
+                              try:
+                                  with open(fp, 'r', encoding='utf-8') as f:
+                                      c = f.read()
+                                  if 'qjz9zk' not in c and ('google.com' in c or 'chromium.org' in c):
+                                      c = c.replace('google.com', 'google.com|9oo91e.qjz9zk').replace('chromium.org', 'chromium.org|ch40m1um.qjz9zk')
+                                      with open(fp, 'w', encoding='utf-8') as f:
+                                          f.write(c)
+                                      print(f'[✔] Extended owner regex domains in {fp}')
+                              except Exception:
+                                  pass
+          print('[✔] Sanitized tools/metrics and components/metrics successfully.')
           "
 
       - name: Setup Hermetic Toolchains (Sysroot, Clang & Rust)
@@ -653,34 +655,36 @@ jobs:
                   f.write(content)
               print('[✔] Sanitized google_url_loader_throttle.cc: disabled Webstore domain check.')
           "
-          echo "[+] Sanitizing tools/metrics XML and structured metrics generator..."
+          echo "[+] Sanitizing tools/metrics and components/metrics XML and generators..."
           python3 -c "
           import os, glob
-          for p in glob.glob('tools/metrics/**/*.xml', recursive=True):
+          for p in glob.glob('tools/**/*.xml', recursive=True) + glob.glob('components/**/*.xml', recursive=True):
               try:
                   with open(p, 'r', encoding='utf-8') as f:
                       c = f.read()
                   if 'qjz9zk' in c:
-                      c = c.replace('@9oo91e.qjz9zk', '@google.com').replace('@qjz9zk', '@google.com')
+                      c = c.replace('@9oo91e.qjz9zk', '@google.com').replace('@ch40m1um.qjz9zk', '@chromium.org').replace('@qjz9zk', '@google.com')
                       with open(p, 'w', encoding='utf-8') as f:
                           f.write(c)
               except Exception:
                   pass
-          for root, _, files in os.walk('tools/metrics/structured'):
-              for file in files:
-                  if file.endswith('.py'):
-                      fp = os.path.join(root, file)
-                      try:
-                          with open(fp, 'r', encoding='utf-8') as f:
-                              c = f.read()
-                          if 'which does not match regex' in c:
-                              c = c.replace('raise ValueError', '# raise ValueError')
-                              with open(fp, 'w', encoding='utf-8') as f:
-                                  f.write(c)
-                              print(f'[✔] Bypassed owner regex check in {fp}')
-                      except Exception:
-                          pass
-          print('[✔] Sanitized tools/metrics successfully.')
+          for search_dir in ['tools/metrics', 'components/metrics']:
+              if os.path.exists(search_dir):
+                  for root, _, files in os.walk(search_dir):
+                      for file in files:
+                          if file.endswith('.py'):
+                              fp = os.path.join(root, file)
+                              try:
+                                  with open(fp, 'r', encoding='utf-8') as f:
+                                      c = f.read()
+                                  if 'qjz9zk' not in c and ('google.com' in c or 'chromium.org' in c):
+                                      c = c.replace('google.com', 'google.com|9oo91e.qjz9zk').replace('chromium.org', 'chromium.org|ch40m1um.qjz9zk')
+                                      with open(fp, 'w', encoding='utf-8') as f:
+                                          f.write(c)
+                                      print(f'[✔] Extended owner regex domains in {fp}')
+                              except Exception:
+                                  pass
+          print('[✔] Sanitized tools/metrics and components/metrics successfully.')
           "
 
       - name: Setup Hermetic Toolchains (Clang & Rust on macOS)
