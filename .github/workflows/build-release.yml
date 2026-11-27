@@ -723,8 +723,8 @@ jobs:
           echo "[+] Patching missing NSScreen CGDirectDisplayID for macOS 15 SDK in ui/display/mac..."
           python3 -c "import os, glob; [open(p, 'w').write(open(p).read().replace('screen.CGDirectDisplayID', '(((NSNumber*)[[screen deviceDescription] objectForKey:@\"NSScreenNumber\"]).unsignedIntValue)')) for p in glob.glob('ui/display/mac/*.mm') if os.path.exists(p) and 'screen.CGDirectDisplayID' in open(p).read()]" || true
 
-          echo "[+] Sanitizing macOS test dependencies for safe_browsing_mode=0..."
-          python3 -c "import os; p='chrome/test/BUILD.gn'; os.path.exists(p) and open(p, 'w').write('\n'.join([line for line in open(p).read().splitlines() if 'disk_image_type_sniffer_mac' not in line and 'archive_analyzer_results' not in line]))" || true
+          echo "[+] Injecting empty stub targets in chrome/common/safe_browsing/BUILD.gn for macOS..."
+          printf '%s\n' '' 'source_set("disk_image_type_sniffer_mac") {}' 'source_set("archive_analyzer_results") {}' >> chrome/common/safe_browsing/BUILD.gn || true
 
           echo "[+] Clamping installed toolchains and binaries to reproducible past epoch..."
           if command -v gtouch &>/dev/null; then
