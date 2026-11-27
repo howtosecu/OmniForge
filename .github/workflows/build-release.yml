@@ -166,6 +166,17 @@ jobs:
             echo "[+] Configuring Agentic Stealth Edition (Applying full 124 patches including C++ fingerprint)..."
           fi
           python3 ../core-whitelist/utils/patches.py apply --continue-on-fail . ../core-whitelist/patches
+          python3 -c "
+          import os
+          path = 'chrome/common/google_url_loader_throttle.cc'
+          if os.path.exists(path):
+              with open(path, 'r', encoding='utf-8') as f:
+                  content = f.read()
+              content = content.replace('extension_urls::IsWebstoreDomain(response_url)', 'false')
+              with open(path, 'w', encoding='utf-8') as f:
+                  f.write(content)
+              print('[✔] Sanitized google_url_loader_throttle.cc: disabled Webstore domain check.')
+          "
 
       - name: Setup Hermetic Toolchains (Sysroot, Clang & Rust)
         run: |
@@ -602,6 +613,17 @@ jobs:
             echo "[+] Configuring Agentic Stealth Edition (Applying full 124 patches including C++ fingerprint)..."
           fi
           python3 ../core-whitelist/utils/patches.py apply --continue-on-fail . ../core-whitelist/patches
+          python3 -c "
+          import os
+          path = 'chrome/common/google_url_loader_throttle.cc'
+          if os.path.exists(path):
+              with open(path, 'r', encoding='utf-8') as f:
+                  content = f.read()
+              content = content.replace('extension_urls::IsWebstoreDomain(response_url)', 'false')
+              with open(path, 'w', encoding='utf-8') as f:
+                  f.write(content)
+              print('[✔] Sanitized google_url_loader_throttle.cc: disabled Webstore domain check.')
+          "
 
       - name: Setup Hermetic Toolchains (Clang & Rust on macOS)
         run: |
