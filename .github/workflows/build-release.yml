@@ -138,7 +138,7 @@ jobs:
           echo "Downloading engine source tarball v${VERSION}..."
           mkdir -p engine-src
           URL="https://commondatastorage.googleapis.com/chromium-browser-official/chromium-${VERSION}.tar.xz"
-          curl -fSL "$URL" -o engine.tar.xz
+          curl -fL --retry 5 --retry-connrefused --retry-delay 10 --retry-max-time 1800 -C - "$URL" -o engine.tar.xz
           tar -xf engine.tar.xz --strip-components=1 -C engine-src
           rm -f engine.tar.xz
           echo "[+] Setting source tree to reproducible past epoch (2026-01-01)..."
@@ -612,7 +612,7 @@ jobs:
           echo "Downloading engine source tarball v${VERSION}..."
           mkdir -p engine-src
           URL="https://commondatastorage.googleapis.com/chromium-browser-official/chromium-${VERSION}.tar.xz"
-          curl -fSL "$URL" -o engine.tar.xz
+          curl -fL --retry 5 --retry-connrefused --retry-delay 10 --retry-max-time 1800 -C - "$URL" -o engine.tar.xz
           tar -xf engine.tar.xz --strip-components=1 -C engine-src
           rm -f engine.tar.xz
           echo "[+] Setting source tree to reproducible past epoch (2026-01-01)..."
