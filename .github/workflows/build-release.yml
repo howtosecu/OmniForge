@@ -208,6 +208,34 @@ jobs:
                                   pass
           print('[✔] Sanitized tools/metrics and components/metrics successfully.')
           "
+          echo "[+] Sanitizing SearchifyStarted in browser_user_education_service and pdf_document_helper..."
+          python3 -c "
+          import os, glob
+          p = 'chrome/browser/ui/views/user_education/browser_user_education_service.cc'
+          if os.path.exists(p):
+              with open(p, 'r', encoding='utf-8') as f:
+                  c = f.read()
+              if 'SearchifyStarted' in c:
+                  c = c.replace('pdf_doc_helper->SearchifyStarted()', 'false')
+                  c = c.replace('SearchifyStarted()', 'false')
+                  with open(p, 'w', encoding='utf-8') as f:
+                      f.write(c)
+                  print('[✔] Neutralized SearchifyStarted in browser_user_education_service.cc')
+          for ph in glob.glob('components/pdf/**/*.h', recursive=True) + glob.glob('pdf/**/*.h', recursive=True):
+              if os.path.basename(ph) == 'pdf_document_helper.h':
+                  try:
+                      with open(ph, 'r', encoding='utf-8') as f:
+                          h = f.read()
+                      if 'SearchifyStarted' not in h and 'class PDFDocumentHelper' in h:
+                          idx = h.find('public:')
+                          if idx != -1:
+                              h = h[:idx+7] + '\n  bool SearchifyStarted() const { return false; }\n' + h[idx+7:]
+                              with open(ph, 'w', encoding='utf-8') as f:
+                                  f.write(h)
+                              print(f'[✔] Injected stub SearchifyStarted() into {ph}')
+                  except Exception as e:
+                      print(f'Warning: failed injecting into {ph}: {e}')
+          "
 
       - name: Setup Hermetic Toolchains (Sysroot, Clang & Rust)
         run: |
@@ -685,6 +713,34 @@ jobs:
                               except Exception:
                                   pass
           print('[✔] Sanitized tools/metrics and components/metrics successfully.')
+          "
+          echo "[+] Sanitizing SearchifyStarted in browser_user_education_service and pdf_document_helper..."
+          python3 -c "
+          import os, glob
+          p = 'chrome/browser/ui/views/user_education/browser_user_education_service.cc'
+          if os.path.exists(p):
+              with open(p, 'r', encoding='utf-8') as f:
+                  c = f.read()
+              if 'SearchifyStarted' in c:
+                  c = c.replace('pdf_doc_helper->SearchifyStarted()', 'false')
+                  c = c.replace('SearchifyStarted()', 'false')
+                  with open(p, 'w', encoding='utf-8') as f:
+                      f.write(c)
+                  print('[✔] Neutralized SearchifyStarted in browser_user_education_service.cc')
+          for ph in glob.glob('components/pdf/**/*.h', recursive=True) + glob.glob('pdf/**/*.h', recursive=True):
+              if os.path.basename(ph) == 'pdf_document_helper.h':
+                  try:
+                      with open(ph, 'r', encoding='utf-8') as f:
+                          h = f.read()
+                      if 'SearchifyStarted' not in h and 'class PDFDocumentHelper' in h:
+                          idx = h.find('public:')
+                          if idx != -1:
+                              h = h[:idx+7] + '\n  bool SearchifyStarted() const { return false; }\n' + h[idx+7:]
+                              with open(ph, 'w', encoding='utf-8') as f:
+                                  f.write(h)
+                              print(f'[✔] Injected stub SearchifyStarted() into {ph}')
+                  except Exception as e:
+                      print(f'Warning: failed injecting into {ph}: {e}')
           "
 
       - name: Setup Hermetic Toolchains (Clang & Rust on macOS)
